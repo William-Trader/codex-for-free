@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1 — 2026-10-23
+
+- 运行时要求明确为 Node.js >= 24（使用内置 `node:sqlite`）。
+- 文档补充与 Noesis 的关系：不内嵌引擎，导出普通 Markdown/JSON，可直接作为 Noesis/Obsidian 知识库。
+- 发布资产与主分支对齐。
+
 ## 0.1.0 — 2026-10-23
 
 首个公开版本。

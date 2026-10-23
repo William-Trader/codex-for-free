@@ -1,6 +1,6 @@
 {
   "name": "codex-for-mac",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Codex for Mac — 自主模型扩展：本地对话/文件夹增强、多家模型接入，保留官方 Codex 框架与 skills。",
   "type": "module",
   "bin": {
