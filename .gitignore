@@ -6,5 +6,6 @@ secrets/
 .DS_Store
 coverage/
 *.tgz
+*.sha256
 dist/
 .cfm/
