@@ -22,6 +22,33 @@ function projectSlug(name, p) {
   return `${slugify(name || path.basename(p || 'inbox'), 40)}-${hash6(p || name || 'inbox')}`;
 }
 function safeRel(rootDir, p) { return path.relative(rootDir, p).split(path.sep).join('/'); }
+
+// Projects the user archived stay archived: auto-sync must not resurrect them.
+function archivedSlugs(rootDir) {
+  const slugs = new Set();
+  const manifest = path.join(rootDir, '_archive', 'manifest.csv');
+  try {
+    const lines = fs.readFileSync(manifest, 'utf8').split(/\r?\n/).slice(1);
+    for (const line of lines) {
+      const original = line.split(',')[0]?.trim();
+      if (original) slugs.add(path.basename(original));
+    }
+  } catch {}
+  const archiveDir = path.join(rootDir, '_archive');
+  try {
+    for (const ent of fs.readdirSync(archiveDir, { withFileTypes: true })) {
+      if (!ent.isDirectory()) continue;
+      slugs.add(ent.name);
+      const inner = path.join(archiveDir, ent.name);
+      try {
+        for (const sub of fs.readdirSync(inner, { withFileTypes: true })) {
+          if (sub.isDirectory()) slugs.add(sub.name);
+        }
+      } catch {}
+    }
+  } catch {}
+  return slugs;
+}
 function inside(rootDir, p) {
   const rel = path.relative(rootDir, p);
   return rel && !rel.startsWith('..') && !path.isAbsolute(rel);
@@ -106,6 +133,7 @@ export function exportLibrary({ rootDir = libraryRoot(), codexHome = CODEX_HOME,
   const convIndex = [];
   const skipped = [];
   const missing = [];
+  const archived = archivedSlugs(rootDir);
   let bytes = 0;
 
   function ensureProject(proj) {
@@ -133,6 +161,9 @@ export function exportLibrary({ rootDir = libraryRoot(), codexHome = CODEX_HOME,
   for (const t of threads) {
     let proj = bestProject(projects, t.cwd, t.project_id);
     if (!proj && t.cwd) proj = { id: null, name: path.basename(t.cwd), path: t.cwd };
+    const projPath = proj?.path || '';
+    const projSlug = projPath ? projectSlug(proj.name || path.basename(projPath), projPath) : 'inbox';
+    if (archived.has(projSlug)) { skipped.push({ id: t.id, reason: 'archived' }); continue; }
     const pmeta = ensureProject(proj);
     const created = t.created_at ? new Date(Number(t.created_at) * 1000) : new Date();
     const ymd = created.toISOString().slice(0, 10).replace(/-/g, '');
@@ -215,8 +246,13 @@ export function exportLibrary({ rootDir = libraryRoot(), codexHome = CODEX_HOME,
   for (const p of projIndex.values()) projectMap.set(p.slug, p);
   const convMap = new Map((prev.conversations || []).map((c) => [c.id, c]));
   for (const c of convIndex) convMap.set(c.id, c);
-  const mergedProjects = [...projectMap.values()].sort((a, b) => a.name.localeCompare(b.name));
-  const mergedConversations = [...convMap.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const mergedProjects = [...projectMap.values()]
+    .filter((p) => p.slug === 'inbox' || (!archived.has(p.slug) && fs.existsSync(path.join(rootDir, p.dir))))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const keepSlugs = new Set(mergedProjects.map((p) => p.slug));
+  const mergedConversations = [...convMap.values()]
+    .filter((c) => c.projectSlug === 'inbox' || keepSlugs.has(c.projectSlug))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   for (const p of mergedProjects) {
     p.conversations = mergedConversations.filter((c) => c.projectSlug === p.slug).length;
   }

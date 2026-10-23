@@ -6,7 +6,24 @@ import { which } from './util.mjs';
 
 export const HOME = os.homedir();
 export const OFFICIAL_CODEX_HOME = process.env.OFFICIAL_CODEX_HOME || path.join(HOME, '.codex');
-export const CODEX_HOME = process.env.CFM_CODEX_HOME || process.env.CODEX_HOME || path.join(HOME, '.codex-for-free');
+
+// The live GPT frontend reads ~/.codex. Older installs used ~/.codex-for-free.
+// Pick whichever directory actually holds conversation history, preferring the live one.
+function hasThreads(dir) {
+  try { return fs.statSync(path.join(dir, 'thread_history_1.sqlite')).size > 64 * 1024; } catch { return false; }
+}
+
+function pickCodexHome() {
+  const override = process.env.CFM_CODEX_HOME || process.env.CODEX_HOME;
+  if (override) return override;
+  const live = path.join(HOME, '.codex');
+  const legacy = path.join(HOME, '.codex-for-free');
+  for (const dir of [live, legacy]) if (hasThreads(dir)) return dir;
+  for (const dir of [live, legacy]) if (fs.existsSync(dir)) return dir;
+  return live;
+}
+
+export const CODEX_HOME = pickCodexHome();
 export const CFM_HOME = process.env.CFM_HOME || path.join(HOME, '.codex-for-mac');
 export const CONFIG_PATH = path.join(CODEX_HOME, 'config.toml');
 export const OFFICIAL_CONFIG_PATH = path.join(OFFICIAL_CODEX_HOME, 'config.toml');
@@ -25,14 +42,29 @@ export const DEFAULT_LIBRARY = path.join(HOME, 'Documents', 'Codex Library');
 
 const BUNDLED_CODEX = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'codex-cli', 'bin', 'codex');
 
+function installedAppBins() {
+  const found = [];
+  for (const base of ['/Applications', path.join(HOME, 'Applications')]) {
+    let entries = [];
+    try { entries = fs.readdirSync(base, { withFileTypes: true }); } catch { continue; }
+    for (const ent of entries) {
+      if (!ent.isDirectory() || !ent.name.endsWith('.app')) continue;
+      found.push(path.join(base, ent.name, 'Contents', 'Resources', 'codex-cli', 'bin', 'codex'));
+    }
+  }
+  return found;
+}
+
 export function locateCodex() {
   const candidates = [
     process.env.CODEX_BIN,
     BUNDLED_CODEX,
+    '/Applications/Codex for Free.app/Contents/Resources/codex-cli/bin/codex',
     '/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex',
     '/Applications/Codex.app/Contents/Resources/codex-cli/bin/codex',
+    path.join(HOME, 'Applications', 'Codex for Free.app', 'Contents', 'Resources', 'codex-cli', 'bin', 'codex'),
     path.join(HOME, 'Applications', 'ChatGPT.app', 'Contents', 'Resources', 'codex-cli', 'bin', 'codex'),
-    path.join(HOME, 'Applications', 'ChatGPT-official.app', 'Contents', 'Resources', 'codex-cli', 'bin', 'codex'),
+    ...installedAppBins(),
     which('codex')
   ].filter(Boolean);
   for (const p of candidates) {

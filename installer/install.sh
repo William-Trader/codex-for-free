@@ -11,9 +11,14 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
 fi
 
 if [[ ! -d "$OFFICIAL" ]]; then
-  echo "ChatGPT.app not found at: $OFFICIAL" >&2
-  echo "Install the official ChatGPT macOS app first, or set CHATGPT_APP." >&2
-  exit 1
+  if [[ -d "$TARGET" ]]; then
+    # Repair path: rebuild the frontend from the copy already installed.
+    OFFICIAL="$TARGET"
+  else
+    echo "ChatGPT.app not found at: $OFFICIAL" >&2
+    echo "Install the official ChatGPT macOS app first, or set CHATGPT_APP." >&2
+    exit 1
+  fi
 fi
 
 KEY="${CFM_KEY:-${DEEPSEEK_API_KEY:-${CFM_DEEPSEEK_KEY:-}}}"
@@ -119,6 +124,34 @@ PY
 
 if [[ -n "$OLD" ]]; then
   rm -rf "$OLD"
+fi
+
+# Install the CLI layer when the package ships it (bin/ and src/ next to installer/).
+PKG_ROOT="$(cd "$ROOT/.." && pwd)"
+if [[ -f "$PKG_ROOT/bin/cfm.mjs" && -d "$PKG_ROOT/src" ]]; then
+  CFM_APP="$HOME/.codex-for-mac/app"
+  mkdir -p "$CFM_APP"
+  rm -rf "$CFM_APP/bin" "$CFM_APP/src"
+  cp -R "$PKG_ROOT/bin" "$PKG_ROOT/src" "$CFM_APP/"
+  cp "$PKG_ROOT/package.json" "$CFM_APP/package.json"
+  chmod +x "$CFM_APP/bin/cfm.mjs"
+  LINK_DIR="/usr/local/bin"
+  if [[ ! -w "$LINK_DIR" ]]; then
+    LINK_DIR="$HOME/.local/bin"
+    mkdir -p "$LINK_DIR"
+  fi
+  ln -sf "$CFM_APP/bin/cfm.mjs" "$LINK_DIR/cfm"
+  ln -sf "$CFM_APP/bin/cfm.mjs" "$LINK_DIR/cff"
+  echo "CLI: $LINK_DIR/cfm"
+  case ":$PATH:" in
+    *":$LINK_DIR:"*) ;;
+    *)
+      if ! grep -q 'cfm:path' "$HOME/.zshrc" 2>/dev/null; then
+        printf '\n# cfm:path\nexport PATH="%s:$PATH"\n' "$LINK_DIR" >> "$HOME/.zshrc"
+        echo "PATH: added $LINK_DIR to ~/.zshrc"
+      fi
+      ;;
+  esac
 fi
 
 open -a "$TARGET"

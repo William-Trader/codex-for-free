@@ -183,6 +183,61 @@ function keyFromConfig() {
   } catch { return ''; }
 }
 
+function installCli(dirFlag) {
+  const script = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'cfm.mjs');
+  if (!fs.existsSync(script)) throw new Error('找不到 bin/cfm.mjs');
+  try { fs.chmodSync(script, 0o755); } catch {}
+  const dirs = dirFlag ? [path.resolve(dirFlag)] : ['/usr/local/bin', path.join(HOME, '.local', 'bin')];
+  const problems = [];
+  let target = null;
+  for (const dir of dirs) {
+    try {
+      fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
+      fs.accessSync(dir, fs.constants.W_OK);
+      target = dir;
+      break;
+    } catch (e) {
+      problems.push(`${dir}: ${e.code || e.message}`);
+    }
+  }
+  if (!target) throw new Error('没有可写目录，用 --dir 指定：' + problems.join('; '));
+  const links = [];
+  for (const name of ['cfm', 'cff']) {
+    const link = path.join(target, name);
+    let current = null;
+    try { current = fs.readlinkSync(link); } catch {}
+    if (current) {
+      if (path.resolve(target, current) === script) { links.push(link + '（已存在）'); continue; }
+      fs.unlinkSync(link);
+    } else if (fs.existsSync(link)) {
+      throw new Error(`${link} 已存在且不是符号链接，先手动处理`);
+    }
+    fs.symlinkSync(script, link);
+    links.push(link);
+  }
+  const onPath = (process.env.PATH || '').split(path.delimiter).includes(target);
+  let patchedRc = null;
+  if (!onPath) {
+    const rc = path.join(HOME, '.zshrc');
+    const marker = '# cfm:path';
+    let text = '';
+    try { text = fs.readFileSync(rc, 'utf8'); } catch {}
+    if (!text.includes(marker)) {
+      fs.appendFileSync(rc, `\n${marker}\nexport PATH="${target}:$PATH"\n`);
+      patchedRc = rc;
+    }
+  }
+  return { target, script, links, onPath, patchedRc };
+}
+
+function libraryStaleness() {
+  const idx = readLibrary();
+  const indexAt = idx.generatedAt ? Date.parse(idx.generatedAt) : 0;
+  let sourceAt = 0;
+  try { sourceAt = fs.statSync(path.join(CODEX_HOME, 'thread_history_1.sqlite')).mtimeMs; } catch {}
+  return { indexAt, sourceAt, stale: sourceAt > indexAt + 60_000 };
+}
+
 async function doctorJson() {
   const bin = locateCodex();
   const app = APP_PATH;
@@ -229,17 +284,20 @@ async function doctorJson() {
 }
 
 function runRepair() {
-  const official = process.env.CHATGPT_APP || '/Applications/ChatGPT.app';
-  if (!fs.existsSync(official)) throw new Error('官方 ChatGPT.app 不存在；先安装或更新官方应用');
+  const target = APP_PATH;
+  const preferred = process.env.CHATGPT_APP || '/Applications/ChatGPT.app';
+  // After the official app is removed, repair still works by rebuilding from the installed frontend.
+  const official = [preferred, '/Applications/ChatGPT.app', target].find((p) => p && fs.existsSync(p));
+  if (!official) throw new Error('找不到可用源应用；重新安装官方 ChatGPT.app 或设置 CHATGPT_APP');
   let key = '';
   try { key = readSecret('deepseek'); } catch {}
   if (!key) key = keyFromConfig();
   if (!key) throw new Error('找不到 DeepSeek key；先运行 installer/install.sh');
   const installer = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'installer', 'install.sh');
   if (!fs.existsSync(installer)) throw new Error('installer/install.sh 不存在');
-  const r = spawnSync('zsh', [installer], { env: { ...process.env, CFM_KEY: key }, stdio: 'inherit' });
+  const r = spawnSync('zsh', [installer], { env: { ...process.env, CFM_KEY: key, CHATGPT_APP: official }, stdio: 'inherit' });
   if (r.status !== 0) throw new Error('安装器修复失败，退出码 ' + r.status);
-  return { ok: true, app: APP_PATH, installer };
+  return { ok: true, app: target, source: official, installer };
 }
 
 function runUninstall({ yes = false, keepConfig = false } = {}) {
@@ -316,7 +374,8 @@ export async function main(argv) {
   cfm providers test [id]            测试 base_url + key（省略 id 测试全部）
   cfm catalog build <id>             重新生成模型目录
   cfm codex [...args]                用当前配置启动官方 Codex CLI
-  cfm ui [--port 4317]               启动本地面板（默认打开对话端）
+  cfm install-cli [--dir DIR]        把 cfm 链接到 PATH（/usr/local/bin 或 ~/.local/bin）
+  cfm ui [--port 4317]               启动本地面板（对话前端请用应用图标）
   cfm panel                           只打开管理面板
   cfm knowledge                       打开本地知识库（对话/项目文件）
   cfm completion [zsh|bash]          输出命令补全
@@ -340,12 +399,19 @@ export async function main(argv) {
   if (cmd === 'search') {
     const q = flags._[0] || flags.q;
     if (!q) throw new Error('用法: cfm search <关键词>');
+    let synced = null;
+    const stale = libraryStaleness();
+    if (stale.stale && !flags['no-sync']) {
+      try { synced = exportLibrary({ rootDir: libraryRoot(), codexHome: CODEX_HOME }); } catch (e) { synced = { error: e.message }; }
+    }
     const r = searchLibrary(q, {
       limit: Number(flags.limit || 100),
       includeJson: !!flags.all,
       includeArchive: !!flags.all
     });
-    if (wantJson) return jsonOut(r);
+    if (wantJson) return jsonOut({ ...r, synced, stale: stale.stale });
+    if (synced && !synced.error) out(`（知识库落后，已自动同步：${synced.conversations} 个对话）`);
+    else if (synced?.error) out(`（自动同步失败：${synced.error}）`);
     for (const m of r.matches) out(`${m.path}:${m.line}: ${m.text}`);
     out(`\n${r.total} 个匹配${r.truncated ? '（只显示前 ' + r.matches.length + ' 个）' : ''}`);
     return;
@@ -435,8 +501,11 @@ export async function main(argv) {
     }
     if (sub === 'list' || !sub) {
       const idx = readLibrary();
-      if (wantJson) return jsonOut(idx);
-      printLibrary(idx); return;
+      if (wantJson) return jsonOut({ ...idx, staleness: libraryStaleness() });
+      printLibrary(idx);
+      const st = libraryStaleness();
+      if (st.stale) out('\n  ! 知识库落后于应用会话，运行 cfm library export 更新（cfm search 会自动同步）');
+      return;
     }
     if (sub === 'path') { out(libraryRoot()); return; }
     if (sub === 'set') {
@@ -575,9 +644,21 @@ export async function main(argv) {
     return;
   }
 
+  if (cmd === 'install-cli') {
+    const r = installCli(typeof flags.dir === 'string' ? flags.dir : null);
+    if (wantJson) return jsonOut(r);
+    head('CLI 已安装');
+    for (const link of r.links) out('  ' + link);
+    out('  目标 ' + r.script);
+    if (r.onPath) out('  现在可以直接运行 cfm doctor');
+    else if (r.patchedRc) out(`  已在 ${r.patchedRc} 写入 PATH，新开终端或用 source ${r.patchedRc} 生效`);
+    else out(`  ! ${r.target} 不在 PATH，加一行到 ~/.zshrc：export PATH="${r.target}:$PATH"`);
+    return;
+  }
+
   if (cmd === 'completion') {
     const shell = flags._[0] || 'zsh';
-    const commands = ['doctor','search','backup','restore','repair','uninstall','storage','library','folders','skills','providers','catalog','codex','ui','panel','knowledge','restore-official','check','update','completion'];
+    const commands = ['doctor','search','backup','restore','repair','uninstall','storage','library','folders','skills','providers','catalog','codex','install-cli','ui','panel','knowledge','restore-official','check','update','completion'];
     if (shell === 'bash') {
       out(`complete -W "${commands.join(' ')}" cfm`);
     } else {

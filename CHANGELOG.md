@@ -1,3 +1,11 @@
+## v1.1.3 — 实际使用修复
+
+- CLI 安装到 PATH（cfm install-cli + 安装器链接）
+- 修复 Codex CLI 检测（改名 app 找不到内置 CLI）
+- 修复 CODEX_HOME 指向废弃目录（provider 切换无效）
+- search 自动同步知识库；归档项目不再复活
+- 官方 app 缺失时 repair 可用前端自身重建
+
 ## v1.1.2 — 完整性收尾
 
 - 全量验证与文档矩阵
