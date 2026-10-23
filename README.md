@@ -28,7 +28,7 @@ codex-for-mac 做三件事：
 
 ## 安装
 
-要求：macOS、Node.js >= 22.5（使用内置 `node:sqlite`）、已安装 Codex 应用或 Codex CLI。
+要求：macOS、Node.js >= 24（使用内置 `node:sqlite`）、已安装 Codex 应用或 Codex CLI。
 
 ```bash
 git clone https://github.com/William-Trader/codex-for-mac.git
@@ -71,6 +71,10 @@ cfm providers use mylab --model my-model-a
 **重要**：Codex 0.163+ 只接受 **Responses API**（`wire_api = "responses"`）。供应商必须提供 `POST {baseUrl}/responses`，否则需要自建一个 Responses→Chat Completions 代理。`cfm providers test` 会分别探测 `/models` 与 `/responses`，如实告诉你能否直接用于 Codex。
 
 已在本机实测：DeepSeek `https://api.deepseek.com/v1` 的 `/responses` 可用，`deepseek-v4-pro` / `deepseek-flash` 均可对话。Qwen 等预设是配置模板，是否可直连取决于其 Responses 支持情况与你的账号权限。
+
+## 与 Noesis 的关系
+
+本项目**不内嵌 Noesis 引擎**，也不依赖它运行。导出的库是普通 Markdown / JSON，目录结构稳定，可以直接作为 Noesis、Obsidian、VS Code 的知识库根目录；项目与对话的保存不依赖任何索引服务。
 
 ## 本地对话库长什么样
 

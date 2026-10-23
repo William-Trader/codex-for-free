@@ -7,7 +7,7 @@
     "cfm": "bin/cfm.mjs"
   },
   "engines": {
-    "node": ">=22.5"
+    "node": ">=24"
   },
   "scripts": {
     "test": "node --test",

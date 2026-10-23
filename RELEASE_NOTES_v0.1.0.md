@@ -27,7 +27,7 @@ git clone https://github.com/William-Trader/codex-for-mac.git
 cd codex-for-mac && npm link
 ```
 
-要求 Node.js >= 22.5，已安装 Codex 应用/CLI。
+要求 Node.js >= 24，已安装 Codex 应用/CLI。
 
 ## 实测
 
