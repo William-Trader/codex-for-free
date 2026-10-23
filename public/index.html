@@ -55,6 +55,28 @@ main{padding:18px 20px 40px;max-width:1500px;margin:0 auto}
 .toast{position:fixed;right:18px;bottom:18px;background:#1b2230;border:1px solid #31405c;border-radius:10px;padding:10px 14px;font-size:13px;opacity:0;transform:translateY(8px);transition:.2s;max-width:420px}
 .toast.show{opacity:1;transform:none}
 .hidden{display:none!important}
+.profile-btn{display:flex;align-items:center;gap:8px;background:transparent;border:1px solid var(--line);border-radius:999px;padding:4px 10px 4px 4px}
+.profile-btn:hover{border-color:#3a4557}
+.profile-btn img{width:26px;height:26px;border-radius:50%;display:block}
+.profile-btn span{font-size:12px;color:var(--muted)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);display:grid;place-items:center;z-index:50;padding:20px}
+.about-card{width:340px;max-width:100%;background:#171717;border:1px solid #2f2f2f;border-radius:18px;padding:28px 26px 22px;text-align:center;position:relative;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.about-avatar{width:88px;height:88px;border-radius:22px;display:block;margin:0 auto 14px}
+.about-card h2{font-size:22px;margin:0 0 6px;font-weight:650}
+.about-powered{color:#c9c9c9;font-size:13px;margin-bottom:14px}
+.about-powered b{color:#fff}
+.about-version{color:#8b93a3;font-size:12px}
+.about-date{color:#8b93a3;font-size:12px;margin-top:4px}
+.about-tagline{color:#dfe4ee;font-size:13px;margin:14px 0 16px;line-height:1.6}
+.about-links{display:flex;gap:8px;justify-content:center;margin-bottom:16px;flex-wrap:wrap}
+.about-links a{color:#9ab6ff;text-decoration:none;font-size:12px;border:1px solid #2f3a4f;border-radius:999px;padding:4px 10px}
+.about-copy{color:#6f7787;font-size:11px;border-top:1px solid #262626;padding-top:12px}
+.modal-close{position:absolute;right:12px;top:10px;background:transparent;border:0;color:#8b93a3;font-size:18px;padding:4px 8px;cursor:pointer}
+.welcome{max-width:520px;margin:20px auto;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px}
+.welcome h2{font-size:17px;margin:0 0 6px}
+.welcome p{color:var(--muted);font-size:13px;margin:0 0 12px}
+.welcome ol{margin:0 0 16px 18px;padding:0;color:#cdd4e3;font-size:13px;line-height:1.9}
+.welcome .row{margin-top:4px}
 @media(max-width:980px){.cards{grid-template-columns:repeat(2,1fr)}.split{grid-template-columns:1fr}.providers{grid-template-columns:1fr}}
 </style>
 </head>
@@ -64,7 +86,8 @@ main{padding:18px 20px 40px;max-width:1500px;margin:0 auto}
   <div><h1>Codex for Mac</h1><div class="sub" id="ver">自主模型扩展 · 本地对话库</div></div>
   <div class="grow"></div>
   <button onclick="exportLib()" class="primary">导出全部对话</button>
-  <button onclick="openDir('') ">在 Finder 打开</button>
+  <button onclick="openDir('')">在 Finder 打开</button>
+  <button class="profile-btn" onclick="openAbout()" title="关于 William"><img src="/avatar.svg" alt="William"><span>William</span></button>
 </header>
 <main>
   <div class="cards">
@@ -126,15 +149,61 @@ main{padding:18px 20px 40px;max-width:1500px;margin:0 auto}
     <div class="panel" style="margin-top:12px"><div class="hd">Plugins / Marketplaces</div><div class="bd" style="padding:14px"><div class="chips" id="plugin-list"></div></div></div>
   </section>
 </main>
+<div class="modal hidden" id="aboutModal" onclick="if(event.target===this)closeAbout()">
+  <div class="about-card">
+    <button class="modal-close" onclick="closeAbout()" aria-label="关闭">×</button>
+    <img class="about-avatar" src="/avatar.svg" alt="William">
+    <h2>Codex for Mac</h2>
+    <div class="about-powered">Powered by <b id="about-name">William</b></div>
+    <div class="about-version" id="about-version">v1.0.0</div>
+    <div class="about-date" id="about-date"></div>
+    <p class="about-tagline" id="about-tagline"></p>
+    <div class="about-links">
+      <a id="about-repo" href="#" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="#" onclick="event.preventDefault();openDir('')">本地对话库</a>
+    </div>
+    <div class="about-copy" id="about-copy">© 2026 William</div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 <script>
 let LIB = { projects: [], conversations: [] };
+let ABOUT = null;
 let activeProject = '';
 let activeConv = null;
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function toast(msg) { const el = $('toast'); el.textContent = msg; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2600); }
+function welcomeHTML() {
+  return [
+    '<div class="welcome">',
+    '<h2>欢迎使用 Codex for Mac</h2>',
+    '<p>给不想碰终端的人用的 Codex 前端。三步开始：</p>',
+    '<ol>',
+    '<li>点右上角「导出全部对话」，把现有 Codex 记录变成可浏览的项目文件夹。</li>',
+    '<li>在「模型供应商」接入 DeepSeek / Qwen，或继续用官方 Codex 配置。</li>',
+    '<li>之后在 Codex 里聊天，回来点一下导出即可归档。</li>',
+    '</ol>',
+    '<div class="row"><button class="primary" onclick="exportLib()">一键导出</button>',
+    '<button onclick="tab(\'providers\')">接入模型</button></div>',
+    '</div>'
+  ].join('');
+}
+async function openAbout() {
+  $('aboutModal').classList.remove('hidden');
+  try {
+    ABOUT = await api('/api/about');
+    $('about-name').textContent = ABOUT.name;
+    $('about-version').textContent = 'v' + ABOUT.app.version;
+    $('about-date').textContent = '发布于 ' + ABOUT.releaseDate;
+    $('about-tagline').textContent = ABOUT.tagline;
+    $('about-copy').textContent = ABOUT.copyright;
+    $('about-repo').href = ABOUT.repo;
+  } catch {}
+}
+function closeAbout() { $('aboutModal').classList.add('hidden'); }
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAbout(); });
 async function api(url, opts) { const r = await fetch(url, opts); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }
 function tab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
@@ -146,7 +215,7 @@ function tab(name) {
 async function load() {
   try {
     const s = await api('/api/summary');
-    $('ver').textContent = 'v' + s.app.version + ' · ' + (s.codex.found ? 'Codex ' + (s.codex.version || '') : '未检测到 Codex');
+    $('ver').textContent = 'v' + s.app.version + ' · Powered by William · ' + (s.codex.found ? 'Codex ' + (s.codex.version || '') : '未检测到 Codex');
     $('s-conv').textContent = s.library.conversations ?? 0;
     $('s-proj').textContent = s.library.projects ?? 0;
     $('s-size').textContent = s.storage.total;
@@ -172,7 +241,7 @@ function renderConvs() {
   const list = (LIB.conversations || []).filter(c => !activeProject || c.projectSlug === activeProject);
   $('conv-count').textContent = list.length + ' 个';
   $('list-title').textContent = activeProject ? (LIB.projects.find(p => p.slug === activeProject)?.name || '对话') : '全部对话';
-  if (!list.length) { box.innerHTML = '<div class="empty">暂无对话。点右上角「导出全部对话」生成。</div>'; return; }
+  if (!list.length) { box.innerHTML = (LIB.conversations || []).length ? '<div class="empty">这个项目还没有对话。</div>' : welcomeHTML(); return; }
   box.innerHTML = list.slice(0, 300).map(c =>
     '<div class="item ' + (activeConv === c.files.markdown ? 'active' : '') + '" onclick="openConv(\'' + esc(c.files.markdown) + '\')">' +
     '<div class="t">' + esc(c.title) + '</div><div class="m">' + esc((c.createdAt || '').slice(0,10)) + ' · ' + esc(c.model || '') + ' · ' + esc(c.projectName || '') + '</div></div>'

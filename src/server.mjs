@@ -8,10 +8,31 @@ import { readLibrary, readConversation, exportLibrary, libraryRoot, libraryStats
 import { listSkills } from './skills.mjs';
 import { listProviders, useProvider, testProvider, loadRegistry } from './providers.mjs';
 import { locateCodex, CFM_HOME, HOME } from './paths.mjs';
+import { PROFILE } from './profile.mjs';
 import { run, redact, platform } from './util.mjs';
 
 const PUBLIC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const pkg = JSON.parse(fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'));
+
+const MIME = {
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+  '.css': 'text/css', '.js': 'text/javascript', '.ico': 'image/x-icon', '.webp': 'image/webp'
+};
+function serveStatic(res, pathname) {
+  let rel;
+  try { rel = decodeURIComponent(pathname).replace(/^\/+/, ''); } catch { return false; }
+  if (!rel || rel.includes('\0')) return false;
+  const p = path.resolve(PUBLIC, rel);
+  if (!p.startsWith(PUBLIC + path.sep)) return false;
+  let st;
+  try { st = fs.statSync(p); } catch { return false; }
+  if (!st.isFile()) return false;
+  const type = MIME[path.extname(p).toLowerCase()];
+  if (!type) return false;
+  res.writeHead(200, { 'content-type': type, 'cache-control': 'no-cache' });
+  res.end(fs.readFileSync(p));
+  return true;
+}
 
 function json(res, code, value) {
   const body = JSON.stringify(value);
@@ -76,7 +97,14 @@ export function createServer() {
         res.end(fs.readFileSync(f));
         return;
       }
+      if (req.method === 'GET' && u.pathname === '/about') {
+        const f = path.join(PUBLIC, 'about.html');
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.end(fs.readFileSync(f));
+        return;
+      }
       if (req.method === 'GET' && u.pathname === '/api/summary') return json(res, 200, summary());
+      if (req.method === 'GET' && u.pathname === '/api/about') return json(res, 200, { ...PROFILE, app: { name: 'Codex for Mac', version: pkg.version, repo: PROFILE.repo } });
       if (req.method === 'GET' && u.pathname === '/api/library') return json(res, 200, readLibrary());
       if (req.method === 'GET' && u.pathname === '/api/conversation') {
         const rel = u.searchParams.get('rel');
@@ -114,6 +142,7 @@ export function createServer() {
         if (!b.id) return json(res, 400, { error: 'id required' });
         return json(res, 200, await testProvider(b.id));
       }
+      if (req.method === 'GET' && serveStatic(res, u.pathname)) return;
       json(res, 404, { error: 'not found' });
     } catch (e) {
       json(res, 500, { error: redact(e.message || String(e)) });

@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0.0 — 2026-10-23
+
+首个正式版：从“能用的工具”升级为“给不想用终端的人的 Codex 图形前端”。
+
+### 新增
+
+- 全新「关于」页（/about）与面板内 About 弹窗：William 头像、Powered by William、版本、发布日期、GitHub 链接。
+- 面板头部增加 William 头像入口；副标题显示 Powered by William。
+- 新手欢迎卡：三步引导（导出对话 → 接入模型 → 开始归档）。
+- 双击启动脚本 start.command。
+- README 重写为小白安装路径；明确 v1 的产品定位。
+
+### 保持
+
+- 本地对话 Markdown + JSON 结构化保存、按项目归档。
+- 模型供应商注册/切换/Responses 探活；DeepSeek 实测可用。
+- 官方 Codex 框架、skills、plugins、marketplaces 只读保留。
+- 存储体检、VACUUM、旧会话归档。
+
 ## 0.1.1 — 2026-10-23
 
 - 运行时要求明确为 Node.js >= 24（使用内置 `node:sqlite`）。

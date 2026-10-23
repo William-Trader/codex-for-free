@@ -1,7 +1,7 @@
 {
   "name": "codex-for-mac",
-  "version": "0.1.1",
-  "description": "Codex for Mac — 自主模型扩展：本地对话/文件夹增强、多家模型接入，保留官方 Codex 框架与 skills。",
+  "version": "1.0.0",
+  "description": "Codex for Mac v1 — 给不想用终端的人：图形化 Codex 前端、本地对话/项目库、多家模型接入。Powered by William.",
   "type": "module",
   "bin": {
     "cfm": "bin/cfm.mjs"
@@ -34,6 +34,7 @@
     "public",
     "README.md",
     "LICENSE",
-    "NOTICE"
+    "NOTICE",
+    "start.command"
   ]
 }

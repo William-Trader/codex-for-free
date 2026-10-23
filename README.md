@@ -1,125 +1,102 @@
-# codex for mac — 自主模型扩展
+# Codex for Mac · v1.0
 
-把 Codex 的**本地对话**、**项目文件夹**和**模型接入**做成一套可浏览、可迁移、可维护的本地系统；保留官方 Codex 框架、skills、plugins 与 marketplace，不修改、不重打包官方应用。
+**给不想碰终端的人：一个图形化的 Codex 入口。**
 
-> 本项目只包含我们自己的代码（MIT）。Codex CLI 属于 OpenAI（Apache-2.0），Codex/ChatGPT 桌面应用为闭源专有软件；本项目**不包含也未重新分发**它们的源码或二进制。
+双击启动 → 浏览器面板 → 选模型 → 聊天记录自动按项目保存。  
+不需要记命令，不需要翻 `~/.codex` 里散落的 JSONL。
 
-## 为什么做这个
+<p align="center"><b>Powered by William</b></p>
 
-Codex 在 macOS 上把会话散落在 `~/.codex/sessions/*.jsonl`、`state_5.sqlite`、`thread_history_1.sqlite` 里：能跑，但不好找、不好读、不好带走。
+## 30 秒开始（小白版）
 
-codex-for-mac 做三件事：
-
-1. **本地对话结构化保存**：把每个对话导出成同名 `.md`（给人看）和 `.json`（给程序看），按项目归档到普通文件夹。
-2. **项目文件夹一眼可见**：项目、路径、对话数量、失效路径都能在面板里看到，一键在 Finder 显示。
-3. **模型自主扩展**：DeepSeek、Qwen、Kimi、GLM、MiniMax 与任意 OpenAI-compatible 端点，统一注册、切换、测试；智能程度可调。
-
-## 功能
-
-| 模块 | 能力 |
-|---|---|
-| `cfm library` | 导出/浏览本地对话库；按项目分组；结构化 JSON + Markdown；索引 `index.json` |
-| `cfm storage` | 存储体检、SQLite VACUUM、90 天+ 会话归档（只移不删，带 manifest） |
-| `cfm folders` | 项目路径体检：缺失、重复 |
-| `cfm skills` | 只读列出官方 skills / plugins / marketplaces |
-| `cfm providers` | 预设 + 自定义供应商；key 本地 0600；一键设为默认；Responses API 探活 |
-| `cfm ui` | 本地面板（127.0.0.1），浏览项目/对话、预览 Markdown、管理供应商与存储 |
-| `cfm doctor` | 一屏体检：环境、存储、扩展、供应商、风险项 |
-
-## 安装
-
-要求：macOS、Node.js >= 24（使用内置 `node:sqlite`）、已安装 Codex 应用或 Codex CLI。
+1. 安装 **Node.js 24**：<https://nodejs.org>
+2. 下载 Release 里的 `codex-for-mac-1.0.0.tgz`，或克隆本仓库
+3. 任选一种启动方式：
 
 ```bash
-git clone https://github.com/William-Trader/codex-for-mac.git
-cd codex-for-mac
-npm link           # 或 node bin/cfm.mjs
-cfm doctor
-```
-
-## 快速开始
-
-```bash
-# 1. 把现有对话导出成可浏览的本地库
-cfm library export
-cfm library open
-
-# 2. 启动面板
+# A. 双击 start.command（macOS，最省事）
+# B. 终端安装
+npm i -g codex-for-mac-1.0.0.tgz
 cfm ui
-
-# 3. 接入 DeepSeek（已验证）
-cfm providers add deepseek --key-stdin
-cfm providers use deepseek
-cfm providers test deepseek
 ```
 
-> `--key-stdin` 从标准输入读 key：`pbpaste | cfm providers add deepseek --key-stdin`。也可以交互式输入（不回显）或使用 `CFM_KEY` 环境变量。key 只写入 `~/.codex-for-mac/secrets/<id>.key`（0600），不会打印，也不会进入仓库。
+浏览器会自动打开 `http://127.0.0.1:4317`。
 
-## 接入 Qwen 等厂商
+> 第一次打开是空库，点右上角「导出全部对话」即可把现有 Codex 记录整理成项目文件夹。
 
-```bash
-cfm providers presets                 # 查看预设
-cfm providers add qwen --key-stdin    # DashScope 兼容模式
-cfm providers use qwen --model qwen3-max --effort high
+## 为什么是 v1
 
-cfm providers add openai-compatible \
-  --id mylab --base-url https://example.com/v1 \
-  --models my-model-a,my-model-b --key-stdin
-cfm providers use mylab --model my-model-a
-```
+v0.x 是能用的工具；v1 是给普通人的产品。
 
-**重要**：Codex 0.163+ 只接受 **Responses API**（`wire_api = "responses"`）。供应商必须提供 `POST {baseUrl}/responses`，否则需要自建一个 Responses→Chat Completions 代理。`cfm providers test` 会分别探测 `/models` 与 `/responses`，如实告诉你能否直接用于 Codex。
+| 以前的 Codex | Codex for Mac v1 |
+|---|---|
+| 只会在终端里跑 | 浏览器面板，点按钮就行 |
+| 对话散在 `~/.codex` | 按项目归档成 Markdown / JSON |
+| 找历史要翻文件 | 左侧项目、右侧对话、点开即读 |
+| 换模型要手改 TOML | 供应商页面注册 / 切换 / 探活 |
+| 不知道怎么清理 | 存储体检、VACUUM、旧会话归档 |
 
-已在本机实测：DeepSeek `https://api.deepseek.com/v1` 的 `/responses` 可用，`deepseek-v4-pro` / `deepseek-flash` 均可对话。Qwen 等预设是配置模板，是否可直连取决于其 Responses 支持情况与你的账号权限。
+## 面板里有什么
 
-## 与 Noesis 的关系
+- **对话**：按项目浏览，Markdown 预览，一键在 Finder 显示。
+- **模型供应商**：DeepSeek（实测可用）、Qwen、Kimi、GLM、MiniMax、任意 OpenAI-compatible；带 `/models` 与 `/responses` 探活。
+- **存储**：Codex 占用、SQLite 压缩、90 天+ 会话归档（只移不删）。
+- **扩展**：只读展示官方 skills / plugins / marketplaces。
+- **关于**：William 的个人信息、头像、版本与发布信息（`/about`）。
 
-本项目**不内嵌 Noesis 引擎**，也不依赖它运行。导出的库是普通 Markdown / JSON，目录结构稳定，可以直接作为 Noesis、Obsidian、VS Code 的知识库根目录；项目与对话的保存不依赖任何索引服务。
-
-## 本地对话库长什么样
+## 本地对话库
 
 ```
 ~/Documents/Codex Library/
-├── index.json                     # 项目 + 对话总索引
-├── _README.md
-├── projects/
-│   └── demo-1a2b3c/
-│       ├── project.json           # 名称、路径、是否失效
-│       └── conversations/
-│           ├── 20261023-hello-01a1678a.md
-│           └── 20261023-hello-01a1678a.json
-└── inbox/                         # 未归属项目的对话
+├── index.json
+├── projects/<项目名>-<hash>/
+│   ├── project.json
+│   └── conversations/
+│       ├── 20261023-标题-id.md
+│       └── 20261023-标题-id.json
+└── inbox/
 ```
 
-- `.md`：标题、项目、模型、时间、逐条消息，可直接用 Finder / Obsidian / VS Code 阅读。
-- `.json`：`codex-for-mac/conversation@1` schema，字段稳定，便于脚本处理。
-- 导出前会做密钥脱敏（`sk-*`、`Bearer *`、GitHub token 等）。
-- 重跑是幂等的：默认跳过已存在文件，`--force` 覆盖。
-- 删除这个目录**不会影响 Codex 本体**，随时可重新导出。
+- 每条对话两份：`.md` 给人看，`.json` 给程序读。
+- 重跑幂等，默认跳过已有文件；`--force` 覆盖。
+- 删除这个目录不影响 Codex 本体，重新导出即可。
+- 不内嵌 Noesis 引擎；普通文件格式可直接作为 Noesis / Obsidian / VS Code 的知识库。
+
+## 模型接入
+
+```bash
+cfm providers presets
+cfm providers add deepseek --key-stdin
+cfm providers use deepseek --model deepseek-flash --effort high
+cfm providers test deepseek
+```
+
+**硬约束**：Codex 0.163+ 只接受 **Responses API**（`/responses`）。Qwen 等预设是否可直连取决于厂商；`cfm providers test` 会分别探测 `/models` 与 `/responses`，失败会明确提示，不用假配置硬接。
 
 ## 安全与隐私
 
-- 仓库内没有任何 API key、cookie 或用户数据；`.gitignore` 屏蔽 `.env`、`*.key`、`secrets/`。
-- key 存放：`~/.codex-for-mac/secrets/<provider>.key`，目录 0700 / 文件 0600。
-- 写入 Codex 的配置是 `~/.codex/config.toml`（0600），只做**块级合并**，不整文件覆盖；原有 `[desktop]`、plugins、marketplaces、MCP 配置保留。
-- 面板只监听 `127.0.0.1`，不对外网开放；API 不返回 key，只返回 `hasKey`。
-- 归档只移动不删除，并写 manifest；跨卷时复制并保留原件。
+- 仓库不包含 API key、cookie、用户数据或本机路径。
+- key 存在 `~/.codex-for-mac/secrets/<id>.key`（目录 0700 / 文件 0600），只在 `config.toml`（0600）的 `http_headers` 中使用，输出不回显。
+- 面板只监听 `127.0.0.1`；文件接口校验路径必须在本地库内。
+- 归档只移动不删除，跨卷时复制并保留原件。
 
-## 开发
+## 关于作者
 
-```bash
-npm test
-node bin/cfm.mjs doctor
-node bin/cfm.mjs ui --no-open
-```
+- 作者：**William**（GitHub：[@William-Trader](https://github.com/William-Trader)）
+- 头像：`public/avatar.svg`，替换成自己的图片后重启面板即可。
+- 关于页：`http://127.0.0.1:4317/about`
 
-零运行时依赖，使用 Node 内置 `http`、`node:sqlite`、`child_process`。
+## 技术要求
+
+- macOS
+- Node.js >= 24（使用内置 `node:sqlite`）
+- 已安装 Codex 应用或 Codex CLI
 
 ## 边界
 
-- 不修改、不重打包、不分发 Codex 桌面应用。
-- 不承诺所有厂商都能直连：Codex 的 Responses API 要求是硬约束。
-- 本地库是 Codex 数据的**派生副本**，不是 Codex 的唯一数据源。
+- 不修改、不重打包、不分发 OpenAI 的 Codex 桌面应用。
+- 不承诺所有厂商都能直连：Responses API 是硬约束。
+- 本地库是 Codex 数据的派生副本，不是唯一数据源。
 
 ## License
 

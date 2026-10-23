@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="William">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#9ab6ff"/>
+      <stop offset="0.55" stop-color="#7c9cff"/>
+      <stop offset="1" stop-color="#3ddc97"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.3" cy="0.2" r="0.9">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="256" fill="#0b0d10"/>
+  <circle cx="256" cy="256" r="236" fill="url(#g)"/>
+  <circle cx="256" cy="256" r="236" fill="url(#glow)"/>
+  <circle cx="256" cy="256" r="226" fill="none" stroke="#0b0d10" stroke-opacity="0.18" stroke-width="8"/>
+  <text x="256" y="342" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif"
+        font-size="248" font-weight="700" letter-spacing="-14" fill="#08101c">W</text>
+</svg>
