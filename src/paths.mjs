@@ -1,6 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { which } from './util.mjs';
 
 export const HOME = os.homedir();
@@ -22,12 +23,16 @@ export const REGISTRY_PATH = path.join(CFM_HOME, 'providers.json');
 export const CFM_CONFIG_PATH = path.join(CFM_HOME, 'config.json');
 export const DEFAULT_LIBRARY = path.join(HOME, 'Documents', 'Codex Library');
 
+const BUNDLED_CODEX = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'codex-cli', 'bin', 'codex');
+
 export function locateCodex() {
   const candidates = [
     process.env.CODEX_BIN,
+    BUNDLED_CODEX,
     '/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex',
     '/Applications/Codex.app/Contents/Resources/codex-cli/bin/codex',
     path.join(HOME, 'Applications', 'ChatGPT.app', 'Contents', 'Resources', 'codex-cli', 'bin', 'codex'),
+    path.join(HOME, 'Applications', 'ChatGPT-official.app', 'Contents', 'Resources', 'codex-cli', 'bin', 'codex'),
     which('codex')
   ].filter(Boolean);
   for (const p of candidates) {

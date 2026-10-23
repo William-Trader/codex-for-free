@@ -8,7 +8,7 @@ import { readLibrary, readConversation, exportLibrary, libraryRoot, libraryStats
 import { listSkills } from './skills.mjs';
 import { PRESETS, parseModels, listProviders, useProvider, testProvider, loadRegistry, testConnection, onboardProvider } from './providers.mjs';
 import { checkForUpdates, updateNow } from './update.mjs';
-import { locateCodex, CFM_HOME, HOME, CONFIG_PATH } from './paths.mjs';
+import { locateCodex, CODEX_HOME, CFM_HOME, HOME, CONFIG_PATH } from './paths.mjs';
 import { PROFILE } from './profile.mjs';
 import { run, redact, platform } from './util.mjs';
 
@@ -151,6 +151,59 @@ export function createServer() {
       if (req.method === 'POST' && !originOk(req)) return json(res, 403, { error: 'origin not allowed' });
       if (req.method === 'POST' && rateLimited(req)) return json(res, 429, { error: 'too many requests' });
       if (req.method === 'POST' && u.pathname === '/api/update/run') return json(res, 200, updateNow());
+      if (req.method === 'POST' && u.pathname === '/api/chat') {
+        const b = await body(req);
+        const prompt = String(b.prompt || '').trim();
+        if (!prompt) return json(res, 400, { error: 'prompt required' });
+        const bin = locateCodex();
+        if (!bin) return json(res, 400, { error: 'Codex CLI not found' });
+        const session = String(b.sessionId || '').trim();
+        const args = session
+          ? ['exec', 'resume', session, '--json', '--skip-git-repo-check', '--sandbox', 'read-only', prompt]
+          : ['exec', '--json', '--skip-git-repo-check', '--sandbox', 'read-only', prompt];
+        const child = spawn(bin, args, {
+          env: { ...process.env, CODEX_HOME },
+          cwd: process.env.CFM_CHAT_CWD || HOME
+        });
+        // codex exec reads stdin when it is a pipe; close it so it does not wait forever.
+        try { child.stdin.end(); } catch {}
+        res.writeHead(200, {
+          'content-type': 'text/event-stream; charset=utf-8',
+          'cache-control': 'no-cache',
+          'connection': 'keep-alive',
+          'x-accel-buffering': 'no'
+        });
+        res.flushHeaders?.();
+        let buf = '';
+        const sendLine = (line) => {
+          if (!line.trim() || res.writableEnded) return;
+          try { res.write('data: ' + line + '\n\n'); } catch {}
+        };
+        child.stdout.on('data', (d) => {
+          buf += d.toString();
+          let i;
+          while ((i = buf.indexOf('\n')) >= 0) {
+            const line = buf.slice(0, i);
+            buf = buf.slice(i + 1);
+            sendLine(line);
+          }
+        });
+        child.stderr.on('data', (d) => {
+          const text = redact(d.toString()).trim();
+          if (!text) return;
+          // codex exec prints this on every run; it is not an error.
+          if (/Reading additional input from stdin/i.test(text)) return;
+          if (!/(error|failed|exception|denied|refused|not found)/i.test(text)) return;
+          sendLine(JSON.stringify({ type: 'stderr', text: text.slice(0, 2000) }));
+        });
+        child.on('close', () => {
+          if (buf) sendLine(buf);
+          if (!res.writableEnded) res.end();
+        });
+        child.on('error', () => { if (!res.writableEnded) res.end(); });
+        req.on('close', () => { try { child.kill(); } catch {} });
+        return;
+      }
       if (req.method === 'POST' && u.pathname === '/api/onboarding/test') {
         const b = await body(req);
         const preset = PRESETS[b.presetId];
@@ -208,11 +261,11 @@ export function createServer() {
   });
 }
 
-export function startServer({ port = 4317, open = true } = {}) {
+export function startServer({ port = 4317, open = true, openPath = '/' } = {}) {
   const server = createServer();
   server.listen(port, '127.0.0.1', () => {
     const url = `http://127.0.0.1:${port}`;
-    if (open) spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
+    if (open) spawn('open', [url + openPath], { detached: true, stdio: 'ignore' }).unref();
     console.log(`codex-for-mac UI: ${url}`);
     console.log(`本地库: ${libraryRoot()}`);
   });

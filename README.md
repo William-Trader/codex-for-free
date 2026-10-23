@@ -1,124 +1,108 @@
 # Codex for Free · macOS
 
-**给不想碰终端的人：一个图形化的 Codex 入口。**
+**把已经安装的官方 GPT 前端，在本机变成 Codex for Free。**
 
-双击启动 → 浏览器面板 → 选模型 → 聊天记录自动按项目保存。  
-不需要记命令，不需要翻 `~/.codex` 里散落的 JSONL。
+当前 Release 提供的是一个本地安装器：复制官方 `ChatGPT.app`，改名为 `Codex for Free.app`，写入 DeepSeek provider 配置，跳过登录页，直接进入 GPT 对话前端。
 
-<p align="center"><b>Powered by William</b></p>
+## 下载与安装
 
-## 平台支持
+Release 资产：
 
-- **本仓库当前发布的是 macOS 版本**，功能与更新优先。
-- **Windows 版本将在几天内推出**；发布后，Windows 版本的更新节奏会慢于 macOS。
-- macOS 版本会继续作为主平台，优先获得新功能、兼容性修复与模型接入更新。
+```text
+Codex-for-Free-1.1.0-Installer.zip
+```
 
-## 与官方 Codex 并存
+使用步骤：
 
-- 官方 Codex 使用 `~/.codex`；Codex for Free 默认使用 `~/.codex-for-free`。
-- 本工具不再改写官方 `config.toml`；旧版本升级后运行 `cfm restore-official` 清除历史修改。
-- `cfm codex ...` 使用隔离配置；官方 app 继续使用官方账号与模型。
-- `cfm library export` 默认导出隔离会话，`--official` 只读导入官方对话，索引会合并。
-- 官方 Skills / Plugins / Marketplaces 只读展示，不会被修改。
+1. 先安装官方 **ChatGPT.app**（默认路径 `/Applications/ChatGPT.app`）
+2. 解压安装器
+3. 双击 `Install Codex for Free.command`
+4. 输入 DeepSeek API key
+5. 安装完成后自动打开 `Codex for Free.app`
 
-## 直接下载 macOS 应用
-
-- Release 里的 `Codex-for-Free-1.0.7-macOS.zip` 解压后拖进 Applications，双击启动。
-- 独立 bundle id，不会覆盖或接管官方 Codex。
-- 应用已内置 Node 运行时，无需单独安装 Node.js。
-- 应用只负责启动本地面板；官方 Codex 继续独立运行。
-
-## 30 秒开始（小白版）
-
-1. 安装 **Node.js 24**：<https://nodejs.org>
-2. 下载 Release 里的 `codex-for-free-1.0.7.tgz`，或克隆本仓库
-3. 任选一种启动方式：
+终端方式：
 
 ```bash
-# A. 双击 start.command（macOS，最省事）
-# B. 终端安装
-npm i -g codex-for-free-1.0.7.tgz
-cfm ui
+./install.sh
+# 官方 app 不在默认路径时
+CHATGPT_APP="/path/to/ChatGPT.app" ./install.sh
 ```
 
-浏览器会自动打开 `http://127.0.0.1:4317`。
+## 为什么不直接上传 1.7GB 应用
 
-> 第一次打开会自动进入「先把模型接上」向导：选供应商 → 粘贴 API key → 测试 /responses → 保存并进入。key 只写本机 0600 文件；只发送给你选择的供应商。
+当前正在使用的 `Codex for Free.app` 是 **OpenAI 闭源 ChatGPT 应用**的本地改名版本。把整个 app 放进 GitHub Release 属于再分发闭源应用，不能这样做。
 
-## 为什么是 v1
+所以 Release 只包含：
 
-v0.x 是能用的工具；v1 是给普通人的产品。
+- 本地安装/改名脚本
+- 图标
+- DeepSeek 模型目录
+- 配置合并逻辑
 
-| 以前的 Codex | Codex for Free v1 |
-|---|---|
-| 只会在终端里跑 | 浏览器面板，点按钮就行 |
-| 对话散在 `~/.codex` | 按项目归档成 Markdown / JSON |
-| 找历史要翻文件 | 左侧项目、右侧对话、点开即读 |
-| 换模型要手改 TOML | 供应商页面注册 / 切换 / 探活 |
-| 不知道怎么清理 | 存储体检、VACUUM、旧会话归档 |
+官方 app 由使用者自己安装，安装器只在本地操作。
 
-## 面板里有什么
+## 安装器做了什么
 
-- **对话**：按项目浏览，Markdown 预览，一键在 Finder 显示。
-- **模型供应商**：DeepSeek（实测可用）、Qwen、Kimi、GLM、MiniMax、任意 OpenAI-compatible；带 `/models` 与 `/responses` 探活。
-- **存储**：Codex 占用、SQLite 压缩、90 天+ 会话归档（只移不删）。
-- **扩展**：只读展示官方 skills / plugins / marketplaces。
-- **关于**：William 的个人信息、头像、版本与发布信息（`/about`）。
+- 把官方 app 复制到临时目录再修改，避免 macOS App Management 阻止写入
+- 修改显示名为 `Codex for Free`
+- 替换本地图标
+- 重新签名外层 app bundle
+- 写入 `~/.codex/config.toml` 的 DeepSeek provider 配置
+- 保留官方插件、skills、marketplaces 和已有数据
+- 修改配置前自动备份
+- API key 只写入 0600 权限配置，不进入仓库、日志或回复
 
-## 本地对话库
+## 登录绕过
 
-```
-~/Documents/Codex Library/
-├── index.json
-├── projects/<项目名>-<hash>/
-│   ├── project.json
-│   └── conversations/
-│       ├── 20261023-标题-id.md
-│       └── 20261023-标题-id.json
-└── inbox/
-```
+安装器配置：
 
-- 每条对话两份：`.md` 给人看，`.json` 给程序读。
-- 重跑幂等，默认跳过已有文件；`--force` 覆盖。
-- 删除这个目录不影响 Codex 本体，重新导出即可。
-- 不内嵌 Noesis 引擎；普通文件格式可直接作为 Noesis / Obsidian / VS Code 的知识库。
+```toml
+model = "deepseek-v4-pro"
+model_provider = "deepseek"
+model_catalog_json = "~/.codex-for-mac/catalog/deepseek.json"
+model_reasoning_effort = "medium"
 
-## 模型接入
-
-```bash
-cfm providers presets
-cfm providers add deepseek --key-stdin
-cfm providers use deepseek --model deepseek-flash --effort high
-cfm providers test deepseek
+[model_providers.deepseek]
+name = "DeepSeek"
+base_url = "https://api.deepseek.com/v1"
+wire_api = "responses"
 ```
 
-**硬约束**：Codex 0.163+ 只接受 **Responses API**（`/responses`）。Qwen 等预设是否可直连取决于厂商；`cfm providers test` 会分别探测 `/models` 与 `/responses`，失败会明确提示，不用假配置硬接。
+官方前端会使用自定义 provider，不再要求 ChatGPT 登录。`codex login status` 仍可能显示“未登录”，这是预期行为。
 
-## 安全与隐私
+## 恢复官方状态
 
-- 仓库不包含 API key、cookie、用户数据或本机路径。
-- key 存在 `~/.codex-for-mac/secrets/<id>.key`（目录 0700 / 文件 0600），只在 `config.toml`（0600）的 `http_headers` 中使用，输出不回显。
-- 面板只监听 `127.0.0.1`；文件接口校验路径必须在本地库内。
-- 归档只移动不删除，跨卷时复制并保留原件。
+- 官方 `ChatGPT.app` 不会被安装器删除。
+- 配置备份：`~/.codex/config.toml.bak-login-*`
+- 恢复：把备份复制回 `~/.codex/config.toml`
+- 移除前端：把 `/Applications/Codex for Free.app` 移到废纸篓
 
-## 关于作者
+## 限制
 
-- 作者：**William**（GitHub：[@William-Trader](https://github.com/William-Trader)）
-- 头像：`public/avatar.svg`，替换成自己的图片后重启面板即可。
-- 关于页：`http://127.0.0.1:4317/about`
+- 官方 app 自动升级可能覆盖本地改名，升级后需要重新运行安装器。
+- 仅支持 macOS。
+- 登录绕过依赖自定义 provider，不适用于必须使用 ChatGPT 账号云功能的场景。
 
-## 技术要求
+## 工程结构
 
-- macOS
-- Node.js >= 24（使用内置 `node:sqlite`）
-- 已安装 Codex 应用或 Codex CLI
+```text
+installer/
+├── install.sh
+├── Install Codex for Free.command
+├── README.md
+├── AppIcon.icns
+└── catalog/deepseek.json
+```
 
-## 边界
+早期自研面板源码仍保留在 `src/`、`public/`，当前 Release 采用 GPT 前端安装器方案。
 
-- 不修改、不重打包、不分发 OpenAI 的 Codex 桌面应用。
-- 不承诺所有厂商都能直连：Responses API 是硬约束。
-- 本地库是 Codex 数据的派生副本，不是唯一数据源。
+## 安全
+
+- 仓库不包含 API key、cookie 或用户数据。
+- key 只写入 `~/.codex/config.toml`（0600）。
+- 安装器不联网上传任何数据。
+- 官方 app 的本地修改只用于本机，不对外分发。
 
 ## License
 
-MIT（本项目代码）。第三方声明见 [NOTICE](NOTICE)。
+MIT（本项目安装器与脚本代码）。OpenAI ChatGPT.app 不包含在本仓库中，遵循其自身许可。

@@ -129,6 +129,19 @@ button.primary:hover{background:#0e8f70}
 .ob-provider{background:#212121;border-color:#3d3d3d}
 .ob-field input,.ob-field select{background:#1b1b1b;border-color:#3d3d3d}
 .welcome{background:#2a2a2a;border-color:#2f2f2f}
+
+.chat-panel{min-height:560px}
+.chat-log{flex:1;overflow:auto;padding:22px 24px;max-height:560px}
+.chat-log .empty{margin-top:60px}
+.msg{max-width:760px;margin:0 0 14px;padding:11px 14px;border-radius:14px;font-size:13.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.msg.user{margin-left:auto;background:#2f2f2f;border:1px solid #3d3d3d}
+.msg.assistant{background:#262b26;border:1px solid #33402f;color:#e8f0e8}
+.msg.err{background:#3a2222;border:1px solid #5a2f2f;color:#ffd9d9}
+.msg .who{font-size:10.5px;color:#9aa39a;margin-bottom:4px;text-transform:uppercase;letter-spacing:.08em}
+.chat-compose{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line);align-items:flex-end}
+.chat-compose textarea{flex:1;resize:none;background:#1b1b1b;border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--text);font:13.5px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;outline:none;min-height:46px;max-height:160px}
+.chat-compose textarea:focus{border-color:#5a6a5a}
+.chat-compose .btn{height:42px;padding:0 18px}
 </style>
 </head>
 <body>
@@ -149,13 +162,25 @@ button.primary:hover{background:#0e8f70}
   </div>
 
   <div class="tabs">
-    <div class="tab active" data-tab="chat" onclick="tab('chat')">对话</div>
+    <div class="tab active" data-tab="chatui" onclick="tab('chatui')">聊天</div>
+    <div class="tab" data-tab="chat" onclick="tab('chat')">本地库</div>
     <div class="tab" data-tab="providers" onclick="tab('providers')">模型</div>
     <div class="tab" data-tab="storage" onclick="tab('storage')">存储</div>
     <div class="tab" data-tab="ext" onclick="tab('ext')">扩展</div>
   </div>
 
-  <section id="tab-chat">
+  <section id="tab-chatui">
+    <div class="panel chat-panel">
+      <div class="hd">与 Codex 对话 <span class="count" id="chat-model"></span></div>
+      <div class="chat-log" id="chat-log"><div class="empty">直接在这里聊天。模型与密钥使用 Codex for Free 的隔离配置。</div></div>
+      <div class="chat-compose">
+        <textarea id="chat-input" rows="2" placeholder="输入消息，Enter 发送，Shift+Enter 换行"></textarea>
+        <button class="btn primary" id="chat-send" onclick="sendChat()">发送</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-chat" class="hidden">
     <div class="split">
       <div class="panel">
         <div class="hd">项目 <span class="count" id="lib-path"></span></div>
@@ -343,9 +368,75 @@ async function obSubmit() {
 }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAbout(); });
 async function api(url, opts) { const r = await fetch(url, opts); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }
+let CHAT_SESSION = '';
+function chatMsg(role, text, cls) {
+  const log = $('chat-log');
+  const empty = log.querySelector('.empty');
+  if (empty) empty.remove();
+  const el = document.createElement('div');
+  el.className = 'msg ' + (cls || role);
+  const who = document.createElement('div');
+  who.className = 'who';
+  who.textContent = role === 'user' ? '你' : role === 'assistant' ? 'Codex' : '错误';
+  const body = document.createElement('div');
+  body.textContent = text;
+  el.appendChild(who); el.appendChild(body);
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+}
+async function sendChat() {
+  const input = $('chat-input');
+  const btn = $('chat-send');
+  const prompt = input.value.trim();
+  if (!prompt || btn.disabled) return;
+  chatMsg('user', prompt);
+  input.value = '';
+  btn.disabled = true; btn.textContent = '思考中…';
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt, sessionId: CHAT_SESSION })
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j.error || ('HTTP ' + res.status));
+    }
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf('\n\n')) >= 0) {
+        const chunk = buf.slice(0, i);
+        buf = buf.slice(i + 2);
+        for (const line of chunk.split('\n')) {
+          if (!line.startsWith('data: ')) continue;
+          let ev;
+          try { ev = JSON.parse(line.slice(6)); } catch { continue; }
+          if (ev.type === 'thread.started') CHAT_SESSION = ev.thread_id;
+          if (ev.type === 'item.completed' && ev.item && ev.item.type === 'agent_message') chatMsg('assistant', ev.item.text);
+          if (ev.type === 'stderr') chatMsg('err', ev.text, 'err');
+        }
+      }
+    }
+  } catch (e) {
+    chatMsg('err', e.message, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '发送';
+    input.focus();
+  }
+}
+$('chat-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+});
+
 function tab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
-  for (const x of ['chat','providers','storage','ext']) $('tab-' + x).classList.toggle('hidden', x !== name);
+  for (const x of ['chatui','chat','providers','storage','ext']) $('tab-' + x).classList.toggle('hidden', x !== name);
   if (name === 'providers') loadProviders();
   if (name === 'storage') loadStorage();
   if (name === 'ext') loadExt();
@@ -454,6 +545,14 @@ async function loadExt() {
       (s.marketplaces.length ? ' <span class="chip">marketplace: ' + esc(s.marketplaces.join(', ')) + '</span>' : '');
   } catch (e) { toast(e.message); }
 }
+function firstRunGuide() {
+  if (localStorage.getItem('cff_guide_1_0_8')) return;
+  chatMsg('assistant', '欢迎使用 Codex for Free。这里就是对话端，直接在下方输入即可开始。\n\n• 模型：切到「模型」页选择供应商和模型\n• 面板：终端运行 `cfm panel`，或双击桌面的「打开 Codex for Free 面板.command」\n• 知识库：终端运行 `cfm library open` 打开本地对话库\n• 数据隔离：本应用使用 ~/.codex-for-free，不会改写官方配置\n\n第一次使用建议先发一句「你好」测试连通性。');
+  localStorage.setItem('cff_guide_1_0_8', '1');
+}
+const view = new URLSearchParams(location.search).get('view');
+if (view === 'panel') tab('chat');
+if (view !== 'panel') firstRunGuide();
 load();
 </script>
 </body>

@@ -18,7 +18,7 @@ export CFM_CODEX_HOME="$HOME/.codex-for-free"
 export CFM_HOME="$HOME/.codex-for-mac"
 export PATH="$(dirname "$NODE"):/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"
 if curl -fsS --max-time 1 http://127.0.0.1:4317/api/summary >/dev/null 2>&1; then
-  open "http://127.0.0.1:4317"
+  open "http://127.0.0.1:4317/?view=chat"
   exit 0
 fi
 nohup "$NODE" "$APP_DIR/bin/cfm.mjs" ui --no-open --port 4317 >>"$LOG" 2>&1 &
@@ -28,4 +28,4 @@ for i in {1..40}; do
   fi
   sleep 0.25
 done
-open "http://127.0.0.1:4317"
+open "http://127.0.0.1:4317/?view=chat"

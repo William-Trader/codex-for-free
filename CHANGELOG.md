@@ -1,3 +1,10 @@
+## v1.1.0 — GPT 前端安装器
+
+- 新增 `installer/`：把官方 ChatGPT/Codex 前端本地安装为 Codex for Free
+- 本地改名、图标、DeepSeek provider 与登录绕过
+- 安装前备份 `~/.codex/config.toml`，key 只写入 0600 配置
+- 不包含或再分发 OpenAI 应用二进制
+
 # Changelog
 
 ## 1.0.7 — 2026-10-23

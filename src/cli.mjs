@@ -163,6 +163,18 @@ function printLibrary(idx) {
   }
 }
 
+async function openPanel(port, target = '/?view=panel') {
+  const base = `http://127.0.0.1:${port}`;
+  try {
+    const r = await fetch(base + '/api/summary', { signal: AbortSignal.timeout(1200) });
+    if (r.ok) {
+      spawn('open', [base + target], { detached: true, stdio: 'ignore' }).unref();
+      return;
+    }
+  } catch {}
+  startServer({ port, open: true, openPath: target });
+}
+
 export async function main(argv) {
   const [cmd, ...rest] = argv;
   const flags = parseArgs(rest);
@@ -188,7 +200,9 @@ export async function main(argv) {
   cfm providers test <id>            测试 base_url + key
   cfm catalog build <id>             重新生成模型目录
   cfm codex [...args]                用当前配置启动官方 Codex CLI
-  cfm ui [--port 4317]               启动本地面板
+  cfm ui [--port 4317]               启动本地面板（默认打开对话端）
+  cfm panel                           只打开管理面板
+  cfm knowledge                       打开本地知识库（对话/项目文件）
   cfm restore-official                从官方 config.toml 移除 CFM 修改
   cfm check                           检查更新
   cfm update                          安装最新版（npm -g codex-for-free@latest）
@@ -381,6 +395,21 @@ export async function main(argv) {
   if (cmd === 'ui') {
     const port = Number(flags.port || 4317);
     startServer({ port, open: !flags['no-open'] });
+    return;
+  }
+
+  if (cmd === 'panel' || cmd === 'dashboard') {
+    const port = Number(flags.port || 4317);
+    await openPanel(port);
+    out('已打开面板（对话端仍可通过应用图标进入）');
+    return;
+  }
+
+  if (cmd === 'knowledge' || (cmd === 'library' && !flags._[0])) {
+    const dir = libraryRoot();
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    spawn('open', [dir], { detached: true, stdio: 'ignore' }).unref();
+    out('已打开知识库: ' + dir);
     return;
   }
 

@@ -5,8 +5,8 @@
   <key>CFBundleName</key><string>Codex for Free</string>
   <key>CFBundleDisplayName</key><string>Codex for Free</string>
   <key>CFBundleIdentifier</key><string>com.william.codex-for-free</string>
-  <key>CFBundleVersion</key><string>1.0.7</string>
-  <key>CFBundleShortVersionString</key><string>1.0.7</string>
+  <key>CFBundleVersion</key><string>1.1.0</string>
+  <key>CFBundleShortVersionString</key><string>1.1.0</string>
   <key>CFBundleExecutable</key><string>CodexForFree</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>

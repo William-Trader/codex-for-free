@@ -2,13 +2,24 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP="$ROOT/dist/Codex for Free.app"
-ZIP="$ROOT/dist/Codex-for-Free-1.0.7-macOS.zip"
+VERSION="$(node -p "require('$ROOT/package.json').version")"
+ZIP="$ROOT/dist/Codex-for-Free-$VERSION-macOS.zip"
 rm -rf "$APP" "$ZIP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/app"
 cp "$ROOT/macapp/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/macapp/CodexForFree.sh" "$APP/Contents/MacOS/CodexForFree"
 chmod +x "$APP/Contents/MacOS/CodexForFree"
 rsync -a "$ROOT/bin" "$ROOT/src" "$ROOT/public" "$ROOT/package.json" "$APP/Contents/Resources/app/"
+# Bundle the Codex CLI so the app does not depend on ChatGPT.app after install.
+CODEX_CLI_SRC="${CODEX_CLI_SRC:-/Applications/ChatGPT.app/Contents/Resources/codex-cli}"
+if [ ! -d "$CODEX_CLI_SRC" ] && [ -d "$ROOT/vendor/codex-cli" ]; then
+  CODEX_CLI_SRC="$ROOT/vendor/codex-cli"
+fi
+if [ ! -x "$CODEX_CLI_SRC/bin/codex" ]; then
+  echo "Codex CLI not found at $CODEX_CLI_SRC (set CODEX_CLI_SRC)" >&2
+  exit 1
+fi
+rsync -a "$CODEX_CLI_SRC" "$APP/Contents/Resources/"
 # bundle Node.js runtime so the app does not depend on a system install
 NODE_BIN="${NODE_BIN:-$(command -v node)}"
 if [ -z "${NODE_BIN:-}" ] || [ ! -x "$NODE_BIN" ]; then
