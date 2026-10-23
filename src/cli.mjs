@@ -515,16 +515,20 @@ export async function main(argv) {
       const id = flags._[1];
       if (!id) {
         const list = listProviders();
-        if (!list.length) { out('还没有注册供应商。'); return; }
+        if (!list.length) {
+          if (wantJson) return jsonOut([]);
+          out('还没有注册供应商。');
+          return;
+        }
         const results = [];
         for (const p of list) {
           try {
             const r = await testProvider(p.id);
             results.push({ id: p.id, ...r });
-            out(`${p.id}: HTTP ${r.models?.status ?? r.status} · models=${r.modelCount ?? '?'} · responses=${r.responses?.status ?? '?'}`);
+            if (!wantJson) out(`${p.id}: HTTP ${r.models?.status ?? r.status} · models=${r.modelCount ?? '?'} · responses=${r.responses?.status ?? '?'}`);
           } catch (e) {
             results.push({ id: p.id, error: e.message });
-            out(`${p.id}: ! ${e.message}`);
+            if (!wantJson) out(`${p.id}: ! ${e.message}`);
           }
         }
         if (wantJson) return jsonOut(results);

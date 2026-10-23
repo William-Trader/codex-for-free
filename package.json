@@ -1,6 +1,6 @@
 {
   "name": "codex-for-free",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Codex for Free v1.0.7 — 独立 macOS 应用，内置 Node 运行时，无需安装 Node；与官方 Codex 并存。",
   "type": "module",
   "bin": {

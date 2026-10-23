@@ -14,7 +14,7 @@
 ### 使用 GPT 前端
 
 1. 安装官方 ChatGPT macOS 应用
-2. 下载 Release 里的 `Codex-for-Free-1.1.1-Installer.zip`
+2. 下载 Release 里的 `Codex-for-Free-1.1.2-Installer.zip`
 3. 解压后双击 `Install Codex for Free.command`
 4. 输入自己的 DeepSeek API key
 

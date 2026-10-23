@@ -1,3 +1,9 @@
+## v1.1.2 — 完整性收尾
+
+- 全量验证与文档矩阵
+- providers test JSON 输出修复
+- installer key 生成测试
+
 ## v1.1.1 — 维护工具补齐
 
 - search / backup / restore / repair / uninstall
