@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { CODEX_HOME, SKILLS_DIR, PLUGINS_DIR } from './paths.mjs';
+import { CODEX_HOME, OFFICIAL_CODEX_HOME, SKILLS_DIR, PLUGINS_DIR } from './paths.mjs';
 
 function frontmatter(file) {
   try {
@@ -33,17 +33,36 @@ function findSkills(dir, depth = 0) {
   return out;
 }
 
+function readPlugins(dir) {
+  try {
+    return fs.readdirSync(dir, { withFileTypes: true })
+      .filter((e) => e.isDirectory()).map((e) => ({ name: e.name, path: path.join(dir, e.name) }));
+  } catch { return []; }
+}
+
+function marketplaces(file) {
+  try {
+    const cfg = fs.readFileSync(file, 'utf8');
+    return [...cfg.matchAll(/^\[marketplaces\.([^\]]+)\]/gm)].map((m) => m[1]);
+  } catch { return []; }
+}
+
 export function listSkills() {
-  const skills = findSkills(SKILLS_DIR).sort((a, b) => a.name.localeCompare(b.name));
-  let plugins = [];
-  try {
-    plugins = fs.readdirSync(PLUGINS_DIR, { withFileTypes: true })
-      .filter((e) => e.isDirectory()).map((e) => ({ name: e.name, path: path.join(PLUGINS_DIR, e.name) }));
-  } catch {}
-  let marketplaces = [];
-  try {
-    const cfg = fs.readFileSync(path.join(CODEX_HOME, 'config.toml'), 'utf8');
-    marketplaces = [...cfg.matchAll(/^\[marketplaces\.([^\]]+)\]/gm)].map((m) => m[1]);
-  } catch {}
-  return { skills, plugins, marketplaces, skillsDir: SKILLS_DIR, pluginsDir: PLUGINS_DIR };
+  const freeSkills = findSkills(SKILLS_DIR).map((s) => ({ ...s, source: 'free' }));
+  const officialSkillsDir = path.join(OFFICIAL_CODEX_HOME, 'skills');
+  const officialSkills = findSkills(officialSkillsDir).map((s) => ({ ...s, source: 'official' }));
+  const skills = [...freeSkills, ...officialSkills].sort((a, b) => a.name.localeCompare(b.name));
+  const freePlugins = readPlugins(PLUGINS_DIR).map((p) => ({ ...p, source: 'free' }));
+  const officialPluginsDir = path.join(OFFICIAL_CODEX_HOME, 'plugins');
+  const officialPlugins = readPlugins(officialPluginsDir).map((p) => ({ ...p, source: 'official' }));
+  const plugins = [...freePlugins, ...officialPlugins];
+  const marks = [
+    ...marketplaces(path.join(CODEX_HOME, 'config.toml')).map((name) => ({ name, source: 'free' })),
+    ...marketplaces(path.join(OFFICIAL_CODEX_HOME, 'config.toml')).map((name) => ({ name, source: 'official' }))
+  ];
+  return {
+    skills, plugins, marketplaces: marks,
+    skillsDir: SKILLS_DIR, pluginsDir: PLUGINS_DIR,
+    homes: { free: CODEX_HOME, official: OFFICIAL_CODEX_HOME }
+  };
 }

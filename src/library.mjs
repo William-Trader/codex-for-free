@@ -209,12 +209,23 @@ export function exportLibrary({ rootDir = libraryRoot(), codexHome = CODEX_HOME,
     fs.writeFileSync(path.join(dir, 'project.json'), JSON.stringify(meta, null, 2) + '\n', { mode: 0o600 });
   }
 
+  let prev = { projects: [], conversations: [] };
+  try { prev = JSON.parse(fs.readFileSync(path.join(rootDir, 'index.json'), 'utf8')); } catch {}
+  const projectMap = new Map((prev.projects || []).map((p) => [p.slug, p]));
+  for (const p of projIndex.values()) projectMap.set(p.slug, p);
+  const convMap = new Map((prev.conversations || []).map((c) => [c.id, c]));
+  for (const c of convIndex) convMap.set(c.id, c);
+  const mergedProjects = [...projectMap.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const mergedConversations = [...convMap.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  for (const p of mergedProjects) {
+    p.conversations = mergedConversations.filter((c) => c.projectSlug === p.slug).length;
+  }
   const index = {
     schema: SCHEMA,
     generatedAt: new Date().toISOString(),
     root: rootDir,
-    projects: [...projIndex.values()].sort((a, b) => a.name.localeCompare(b.name)),
-    conversations: convIndex.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    projects: mergedProjects,
+    conversations: mergedConversations
   };
   fs.writeFileSync(path.join(rootDir, 'index.json'), JSON.stringify(index, null, 2) + '\n', { mode: 0o600 });
   const readme = path.join(rootDir, '_README.md');

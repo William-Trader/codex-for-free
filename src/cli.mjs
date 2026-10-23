@@ -3,8 +3,9 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
-  CODEX_HOME, CFM_HOME, CONFIG_PATH, CFM_CONFIG_PATH, locateCodex
+  CODEX_HOME, OFFICIAL_CODEX_HOME, OFFICIAL_CONFIG_PATH, CFM_HOME, CONFIG_PATH, CFM_CONFIG_PATH, locateCodex
 } from './paths.mjs';
+import { officialHasCfm, restoreOfficialConfig } from './isolate.mjs';
 import { fmtBytes, platform, redact } from './util.mjs';
 import { storageReport, vacuumAll, archiveOldSessions, folderReport } from './storage.mjs';
 import {
@@ -92,8 +93,9 @@ function printDoctor() {
   const provs = listProviders();
   head('环境');
   out(`  macOS ${plat.release} / ${plat.arch} / node ${plat.node}`);
-  out(`  CODEX_HOME   ${CODEX_HOME}`);
-  out(`  CFM_HOME     ${CFM_HOME}`);
+  out(`  Free home    ${CODEX_HOME}`);
+  out(`  Official home ${OFFICIAL_CODEX_HOME}`);
+  out(`  CFM home     ${CFM_HOME}`);
   out(`  Codex        ${bin || '未找到（设置 CODEX_BIN）'}`);
   if (bin) {
     const v = spawnSync(bin, ['--version'], { encoding: 'utf8' });
@@ -128,6 +130,7 @@ function printDoctor() {
     } catch {}
   }
   if (!lib.exists) warnings.push('本地对话库尚未导出：运行 cfm library export');
+  if (officialHasCfm()) warnings.push('官方 Codex 配置仍含 CFM 修改：运行 cfm restore-official');
   const folders = folderReport();
   if (folders.missing.length) warnings.push(`${folders.missing.length} 个项目路径不存在`);
   head('检查结果');
@@ -173,7 +176,7 @@ export async function main(argv) {
   cfm storage report                 本地存储占用
   cfm storage vacuum [--apply]       压缩 SQLite（WAL checkpoint + VACUUM）
   cfm storage archive --days 90 [--apply]  归档旧会话（只移不删）
-  cfm library export [--out DIR] [--force] 导出结构化对话/项目到本地目录
+  cfm library export [--out DIR] [--force] [--official] 导出结构化对话/项目（--official 读官方库）
   cfm library list                   查看本地对话库
   cfm library open                   在 Finder 打开本地库
   cfm library path | set <dir>       查看/设置本地库位置
@@ -186,6 +189,7 @@ export async function main(argv) {
   cfm catalog build <id>             重新生成模型目录
   cfm codex [...args]                用当前配置启动官方 Codex CLI
   cfm ui [--port 4317]               启动本地面板
+  cfm restore-official                从官方 config.toml 移除 CFM 修改
   cfm check                           检查更新
   cfm update                          安装最新版（npm -g codex-for-free@latest）
 
@@ -232,7 +236,7 @@ export async function main(argv) {
   if (cmd === 'library') {
     const sub = flags._[0];
     if (sub === 'export') {
-      const r = exportLibrary({ rootDir: flags.out || libraryRoot(), force: !!flags.force, limit: Number(flags.limit || 0) });
+      const r = exportLibrary({ rootDir: flags.out || libraryRoot(), codexHome: flags.official ? OFFICIAL_CODEX_HOME : CODEX_HOME, force: !!flags.force, limit: Number(flags.limit || 0) });
       if (wantJson) return jsonOut(r);
       head('导出完成');
       out(`  目录     ${r.root}`);
@@ -357,10 +361,20 @@ export async function main(argv) {
     return;
   }
 
+  if (cmd === 'restore-official') {
+    const r = restoreOfficialConfig();
+    if (wantJson) return jsonOut(r);
+    if (!r.ok) throw new Error(r.error);
+    out('已还原官方 Codex 配置');
+    out('备份: ' + r.backup);
+    out(r.hasCfm ? '! 仍检测到 CFM 标记，请检查配置' : '官方配置已干净，重启 Codex 应用生效');
+    return;
+  }
+
   if (cmd === 'codex') {
     const bin = locateCodex();
     if (!bin) throw new Error('未找到 Codex CLI；设置 CODEX_BIN 或安装 Codex');
-    const r = spawnSync(bin, flags._, { stdio: 'inherit' });
+    const r = spawnSync(bin, rest, { stdio: 'inherit', env: { ...process.env, CODEX_HOME } });
     process.exit(r.status ?? 0);
   }
 

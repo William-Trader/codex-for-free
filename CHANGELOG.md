@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.4 — 2026-10-23
+
+- 与官方 Codex 并存：Codex for Free 默认使用独立目录 ~/.codex-for-free，不再改写官方 ~/.codex 配置。
+- 新增 cfm restore-official：一键移除旧版本写入官方 config.toml 的 model/provider/catalog 修改。
+- cfm codex 通过 CODEX_HOME 使用隔离配置；官方 app 保持官方账号与模型。
+- library export 默认读取隔离库，--official 只读导入官方对话；索引合并，不覆盖。
+- doctor 同时显示 Free/Official 两个 home，并提示官方配置是否仍含 CFM 修改。
+
 ## 1.0.3 — 2026-10-23
 
 - About 页新增「检查更新」与自动更新功能（cfm check / cfm update）。

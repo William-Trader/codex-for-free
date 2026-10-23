@@ -13,16 +13,24 @@
 - **Windows 版本将在几天内推出**；发布后，Windows 版本的更新节奏会慢于 macOS。
 - macOS 版本会继续作为主平台，优先获得新功能、兼容性修复与模型接入更新。
 
+## 与官方 Codex 并存
+
+- 官方 Codex 使用 `~/.codex`；Codex for Free 默认使用 `~/.codex-for-free`。
+- 本工具不再改写官方 `config.toml`；旧版本升级后运行 `cfm restore-official` 清除历史修改。
+- `cfm codex ...` 使用隔离配置；官方 app 继续使用官方账号与模型。
+- `cfm library export` 默认导出隔离会话，`--official` 只读导入官方对话，索引会合并。
+- 官方 Skills / Plugins / Marketplaces 只读展示，不会被修改。
+
 ## 30 秒开始（小白版）
 
 1. 安装 **Node.js 24**：<https://nodejs.org>
-2. 下载 Release 里的 `codex-for-free-1.0.3.tgz`，或克隆本仓库
+2. 下载 Release 里的 `codex-for-free-1.0.4.tgz`，或克隆本仓库
 3. 任选一种启动方式：
 
 ```bash
 # A. 双击 start.command（macOS，最省事）
 # B. 终端安装
-npm i -g codex-for-free-1.0.3.tgz
+npm i -g codex-for-free-1.0.4.tgz
 cfm ui
 ```
 

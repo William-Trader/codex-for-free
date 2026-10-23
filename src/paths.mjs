@@ -4,9 +4,11 @@ import fs from 'node:fs';
 import { which } from './util.mjs';
 
 export const HOME = os.homedir();
-export const CODEX_HOME = process.env.CODEX_HOME || path.join(HOME, '.codex');
+export const OFFICIAL_CODEX_HOME = process.env.OFFICIAL_CODEX_HOME || path.join(HOME, '.codex');
+export const CODEX_HOME = process.env.CFM_CODEX_HOME || process.env.CODEX_HOME || path.join(HOME, '.codex-for-free');
 export const CFM_HOME = process.env.CFM_HOME || path.join(HOME, '.codex-for-mac');
 export const CONFIG_PATH = path.join(CODEX_HOME, 'config.toml');
+export const OFFICIAL_CONFIG_PATH = path.join(OFFICIAL_CODEX_HOME, 'config.toml');
 export const STATE_DB = path.join(CODEX_HOME, 'state_5.sqlite');
 export const LOGS_DB = path.join(CODEX_HOME, 'logs_2.sqlite');
 export const THREAD_HISTORY_DB = path.join(CODEX_HOME, 'thread_history_1.sqlite');
