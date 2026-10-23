@@ -3,12 +3,15 @@ set -u
 APP_DIR="$(cd "$(dirname "$0")/../Resources/app" && pwd)"
 LOG="$HOME/Library/Logs/CodexForFree.log"
 mkdir -p "$HOME/Library/Logs"
-NODE="$(command -v node 2>/dev/null || true)"
-if [ -z "$NODE" ]; then
+NODE="$APP_DIR/../node/bin/node"
+if [ ! -x "$NODE" ]; then
+  NODE="$(command -v node 2>/dev/null || true)"
+fi
+if [ -z "$NODE" ] || [ ! -x "$NODE" ]; then
   NODE="$(/bin/zsh -lc 'command -v node' 2>/dev/null || true)"
 fi
-if [ -z "$NODE" ]; then
-  osascript -e 'display dialog "需要先安装 Node.js 24（nodejs.org）。安装后再打开 Codex for Free。" buttons {"好"} default button 1 with icon caution'
+if [ -z "$NODE" ] || [ ! -x "$NODE" ]; then
+  osascript -e 'display dialog "Codex for Free 内置的 Node 组件缺失，且系统未找到 Node.js。请重新下载完整应用包。" buttons {"好"} default button 1 with icon caution'
   exit 1
 fi
 export CFM_CODEX_HOME="$HOME/.codex-for-free"
