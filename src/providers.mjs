@@ -198,6 +198,75 @@ export async function testProvider(id, fetchImpl = fetch) {
   } finally { clearTimeout(t); }
 }
 
+export function normalizeKey(raw) {
+  let k = String(raw || '').trim().replace(/^Bearer\s+/i, '').trim();
+  if (!k) throw new Error('请填写 API key');
+  if (k.length < 8 || k.length > 4096) throw new Error('API key 长度不合法');
+  if (/[\s\u0000-\u001f]/.test(k)) throw new Error('API key 含空白或控制字符');
+  return k;
+}
+
+export function validateBaseUrl(raw) {
+  let u;
+  try { u = new URL(String(raw || '').trim()); } catch { throw new Error('Base URL 不合法'); }
+  if (u.username || u.password) throw new Error('Base URL 不能包含用户名或密码');
+  if (u.protocol !== 'https:') {
+    const local = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(u.hostname);
+    if (!(u.protocol === 'http:' && local)) throw new Error('只允许 https://，或本机 http://localhost');
+  }
+  u.hash = '';
+  u.search = '';
+  return u.toString().replace(/\/$/, '');
+}
+
+export async function testConnection({ baseUrl, key, model, fetchImpl = fetch }) {
+  const k = normalizeKey(key);
+  const base = validateBaseUrl(baseUrl);
+  const headers = { 'content-type': 'application/json', authorization: `Bearer ${k}` };
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 20000);
+  try {
+    const models = { ok: false, status: null, count: null };
+    try {
+      const r = await fetchImpl(base + '/models', { headers, signal: ctrl.signal });
+      models.status = r.status;
+      models.ok = r.ok;
+      const text = await r.text();
+      try { const j = JSON.parse(text); models.count = Array.isArray(j.data) ? j.data.length : null; } catch {}
+    } catch {}
+    let responses = { ok: false, status: null };
+    if (model) {
+      try {
+        const r2 = await fetchImpl(base + '/responses', {
+          method: 'POST', headers, signal: ctrl.signal,
+          body: JSON.stringify({ model, input: 'ping', max_output_tokens: 8 })
+        });
+        responses = { ok: r2.ok, status: r2.status };
+      } catch {}
+    }
+    return { ok: responses.ok, baseUrl: base, models, responses, model };
+  } finally { clearTimeout(t); }
+}
+
+export async function onboardProvider({ presetId, id, key, baseUrl, models, model, effort, fetchImpl = fetch }) {
+  const preset = PRESETS[presetId];
+  if (!preset) throw new Error(`未知供应商预设: ${presetId}`);
+  const k = normalizeKey(key);
+  const url = validateBaseUrl(baseUrl || preset.baseUrl);
+  const list = models && models.length ? models : preset.models;
+  if (!list.length) throw new Error('请至少提供一个模型 ID');
+  const chosen = model || list[0].id;
+  if (!list.some((m) => m.id === chosen)) throw new Error('选择的模型不在模型列表中');
+  const test = await testConnection({ baseUrl: url, key: k, model: chosen, fetchImpl });
+  if (!test.responses.ok) {
+    throw new Error(`该端点 /responses 返回 ${test.responses.status ?? '不可达'}，Codex 需要 Responses API，未保存`);
+  }
+  const pid = id || presetId;
+  addProvider({ presetId, id: pid, baseUrl: url, models: list, key: k });
+  const used = useProvider(pid, { model: chosen, effort });
+  return { provider: pid, model: chosen, effort: used.effort, test };
+}
+
 export function listProviders() {
   const reg = loadRegistry();
   return Object.values(reg.providers).map((p) => ({

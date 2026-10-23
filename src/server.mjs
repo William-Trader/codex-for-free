@@ -6,8 +6,8 @@ import { spawn } from 'node:child_process';
 import { storageReport, vacuumAll, archiveOldSessions, folderReport } from './storage.mjs';
 import { readLibrary, readConversation, exportLibrary, libraryRoot, libraryStats, revealPath } from './library.mjs';
 import { listSkills } from './skills.mjs';
-import { listProviders, useProvider, testProvider, loadRegistry } from './providers.mjs';
-import { locateCodex, CFM_HOME, HOME } from './paths.mjs';
+import { PRESETS, parseModels, listProviders, useProvider, testProvider, loadRegistry, testConnection, onboardProvider } from './providers.mjs';
+import { locateCodex, CFM_HOME, HOME, CONFIG_PATH } from './paths.mjs';
 import { PROFILE } from './profile.mjs';
 import { run, redact, platform } from './util.mjs';
 
@@ -32,6 +32,27 @@ function serveStatic(res, pathname) {
   res.writeHead(200, { 'content-type': type, 'cache-control': 'no-cache' });
   res.end(fs.readFileSync(p));
   return true;
+}
+
+function modelProvider() {
+  try {
+    const s = fs.readFileSync(CONFIG_PATH, 'utf8');
+    const m = s.match(/^model_provider\s*=\s*"([^"]+)"/m);
+    return m ? m[1] : null;
+  } catch { return null; }
+}
+function originOk(req) {
+  const o = req.headers.origin;
+  if (!o) return true;
+  try { return new URL(o).host === req.headers.host; } catch { return false; }
+}
+const hits = new Map();
+function rateLimited(req) {
+  const ip = req.socket.remoteAddress || 'local';
+  const now = Date.now();
+  const arr = (hits.get(ip) || []).filter((t) => now - t < 60000);
+  if (arr.length >= 30) return true;
+  arr.push(now); hits.set(ip, arr); return false;
 }
 
 function json(res, code, value) {
@@ -64,6 +85,7 @@ function summary() {
     codex: codexInfo(),
     skills: (() => { const s = listSkills(); return { count: s.skills.length, plugins: s.plugins.length, marketplaces: s.marketplaces.length }; })(),
     providers: listProviders(),
+    onboarding: { configured: Boolean(modelProvider() || listProviders().length), provider: modelProvider() },
     folders: folderReport()
   };
 }
@@ -89,6 +111,9 @@ function openFile(rel) {
 
 export function createServer() {
   return http.createServer(async (req, res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
     try {
       const u = new URL(req.url, 'http://127.0.0.1');
       if (req.method === 'GET' && (u.pathname === '/' || u.pathname === '/index.html')) {
@@ -104,6 +129,15 @@ export function createServer() {
         return;
       }
       if (req.method === 'GET' && u.pathname === '/api/summary') return json(res, 200, summary());
+      if (req.method === 'GET' && u.pathname === '/api/onboarding') {
+        return json(res, 200, {
+          configured: Boolean(modelProvider() || listProviders().length),
+          provider: modelProvider(),
+          presets: Object.entries(PRESETS).map(([id, p]) => ({
+            id, name: p.name, baseUrl: p.baseUrl, models: p.models, docs: p.docs, recommended: id === 'deepseek'
+          }))
+        });
+      }
       if (req.method === 'GET' && u.pathname === '/api/about') return json(res, 200, { ...PROFILE, app: { name: 'Codex for Mac', version: pkg.version, repo: PROFILE.repo } });
       if (req.method === 'GET' && u.pathname === '/api/library') return json(res, 200, readLibrary());
       if (req.method === 'GET' && u.pathname === '/api/conversation') {
@@ -112,6 +146,27 @@ export function createServer() {
         return json(res, 200, readConversation({ rel }));
       }
       if (req.method === 'GET' && u.pathname === '/api/providers') return json(res, 200, { providers: listProviders(), registry: Object.keys(loadRegistry().providers) });
+      if (req.method === 'POST' && !originOk(req)) return json(res, 403, { error: 'origin not allowed' });
+      if (req.method === 'POST' && rateLimited(req)) return json(res, 429, { error: 'too many requests' });
+      if (req.method === 'POST' && u.pathname === '/api/onboarding/test') {
+        const b = await body(req);
+        const preset = PRESETS[b.presetId];
+        if (!preset) return json(res, 400, { error: 'unknown preset' });
+        const models = Array.isArray(b.models) ? b.models : (typeof b.models === 'string' ? parseModels(b.models) : preset.models);
+        const model = b.model || models[0]?.id;
+        try {
+          const r = await testConnection({ baseUrl: b.baseUrl || preset.baseUrl, key: b.key, model });
+          return json(res, 200, r);
+        } catch (e) { return json(res, 400, { error: redact(e.message) }); }
+      }
+      if (req.method === 'POST' && u.pathname === '/api/onboarding/apply') {
+        const b = await body(req);
+        const models = Array.isArray(b.models) ? b.models : (typeof b.models === 'string' ? parseModels(b.models) : undefined);
+        try {
+          const r = await onboardProvider({ presetId: b.presetId, id: b.id, key: b.key, baseUrl: b.baseUrl, models, model: b.model, effort: b.effort });
+          return json(res, 200, r);
+        } catch (e) { return json(res, 400, { error: redact(e.message) }); }
+      }
       if (req.method === 'GET' && u.pathname === '/api/skills') return json(res, 200, listSkills());
       if (req.method === 'POST' && u.pathname === '/api/library/export') {
         const b = await body(req);

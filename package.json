@@ -1,6 +1,6 @@
 {
   "name": "codex-for-mac",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Codex for Mac v1 — 给不想用终端的人：图形化 Codex 前端、本地对话/项目库、多家模型接入。Powered by William.",
   "type": "module",
   "bin": {

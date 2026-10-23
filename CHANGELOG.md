@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.1 — 2026-10-23
+
+- 新增首次启动「先把模型接上」向导：选择供应商、粘贴 API key、测试 /models 与 /responses、保存并切换默认模型。
+- 安全：key 长度/字符校验、仅允许 https（本机 localhost 可用 http）、拒绝带凭据的 URL、POST Origin 校验、限流、安全响应头。
+- 修复 providers/test 的 Authorization 头拼接错误。
+- 面板「模型供应商」增加「接入新模型」入口。
+
 ## 1.0.0 — 2026-10-23
 
 首个正式版：从“能用的工具”升级为“给不想用终端的人的 Codex 图形前端”。

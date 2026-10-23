@@ -10,19 +10,19 @@
 ## 30 秒开始（小白版）
 
 1. 安装 **Node.js 24**：<https://nodejs.org>
-2. 下载 Release 里的 `codex-for-mac-1.0.0.tgz`，或克隆本仓库
+2. 下载 Release 里的 `codex-for-mac-1.0.1.tgz`，或克隆本仓库
 3. 任选一种启动方式：
 
 ```bash
 # A. 双击 start.command（macOS，最省事）
 # B. 终端安装
-npm i -g codex-for-mac-1.0.0.tgz
+npm i -g codex-for-mac-1.0.1.tgz
 cfm ui
 ```
 
 浏览器会自动打开 `http://127.0.0.1:4317`。
 
-> 第一次打开是空库，点右上角「导出全部对话」即可把现有 Codex 记录整理成项目文件夹。
+> 第一次打开会自动进入「先把模型接上」向导：选供应商 → 粘贴 API key → 测试 /responses → 保存并进入。key 只写本机 0600 文件；只发送给你选择的供应商。
 
 ## 为什么是 v1
 

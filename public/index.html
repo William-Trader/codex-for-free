@@ -77,6 +77,26 @@ main{padding:18px 20px 40px;max-width:1500px;margin:0 auto}
 .welcome p{color:var(--muted);font-size:13px;margin:0 0 12px}
 .welcome ol{margin:0 0 16px 18px;padding:0;color:#cdd4e3;font-size:13px;line-height:1.9}
 .welcome .row{margin-top:4px}
+.onboard-card{width:560px;max-width:100%;background:#15181f;border:1px solid #2f3746;border-radius:18px;padding:24px;box-shadow:0 30px 80px rgba(0,0,0,.55)}
+.onboard-head h2{font-size:20px;margin:6px 0 6px}
+.onboard-head p{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.6}
+.ob-badge{display:inline-block;font-size:11px;color:#9ab6ff;border:1px solid #2f3a4f;border-radius:999px;padding:2px 9px}
+.ob-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.ob-provider{border:1px solid var(--line);border-radius:10px;padding:12px;cursor:pointer;background:var(--panel)}
+.ob-provider:hover{border-color:#3a4a66;background:#1a202b}
+.ob-provider .name{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
+.ob-provider .url{color:var(--muted);font-size:11px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ob-provider .rec{font-size:10px;color:var(--green);border:1px solid #1f4a3a;border-radius:999px;padding:1px 6px}
+.ob-field{margin:12px 0}
+.ob-field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+.ob-field input,.ob-field select{width:100%;background:#0e1117;border:1px solid var(--line);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;outline:none}
+.ob-field input:focus,.ob-field select:focus{border-color:#3a4a66}
+.ob-note{font-size:11.5px;color:var(--muted);line-height:1.6;background:#10141b;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:12px 0}
+.ob-status{font-size:12.5px;margin-top:12px;min-height:18px;color:var(--muted);white-space:pre-wrap}
+.ob-status.ok{color:var(--green)}
+.ob-status.err{color:var(--red)}
+.ob-back{background:transparent;border:0;color:var(--muted);padding:0;margin-bottom:10px;cursor:pointer}
+.onboard-card h3{font-size:16px;margin:4px 0 8px}
 @media(max-width:980px){.cards{grid-template-columns:repeat(2,1fr)}.split{grid-template-columns:1fr}.providers{grid-template-columns:1fr}}
 </style>
 </head>
@@ -149,6 +169,26 @@ main{padding:18px 20px 40px;max-width:1500px;margin:0 auto}
     <div class="panel" style="margin-top:12px"><div class="hd">Plugins / Marketplaces</div><div class="bd" style="padding:14px"><div class="chips" id="plugin-list"></div></div></div>
   </section>
 </main>
+<div class="modal hidden" id="onboardModal">
+  <div class="onboard-card">
+    <div class="onboard-head">
+      <span class="ob-badge">第一次使用</span>
+      <h2>先把模型接上</h2>
+      <p>选择供应商 → 粘贴 API key → 测试并保存。key 只写本机 0600 文件；只发送给你选择的供应商。</p>
+    </div>
+    <div id="obStep1" class="ob-grid"></div>
+    <div id="obStep2" class="hidden">
+      <button class="ob-back" onclick="obBack()">← 换一个供应商</button>
+      <h3 id="obName"></h3>
+      <div class="ob-field"><label>API Key</label><input id="obKey" type="password" placeholder="粘贴 API key" autocomplete="off" spellcheck="false"></div>
+      <div class="ob-field"><label>模型</label><select id="obModel"></select></div>
+      <div class="ob-field hidden" id="obCustom"><label>Base URL</label><input id="obBase" placeholder="https://your-endpoint/v1" autocomplete="off" spellcheck="false"></div>
+      <div class="ob-note">🔒 key 只保存在 ~/.codex-for-mac/secrets/（0600）。测试只直接请求你填写的供应商；面板不记录、不回显 key。</div>
+      <div class="row"><button class="primary" id="obGo" onclick="obSubmit()">测试并保存</button><button class="ghost" onclick="obSkip()">稍后</button></div>
+      <div class="ob-status" id="obStatus"></div>
+    </div>
+  </div>
+</div>
 <div class="modal hidden" id="aboutModal" onclick="if(event.target===this)closeAbout()">
   <div class="about-card">
     <button class="modal-close" onclick="closeAbout()" aria-label="关闭">×</button>
@@ -169,6 +209,7 @@ main{padding:18px 20px 40px;max-width:1500px;margin:0 auto}
 <script>
 let LIB = { projects: [], conversations: [] };
 let ABOUT = null;
+let OB = null;
 let activeProject = '';
 let activeConv = null;
 
@@ -203,6 +244,72 @@ async function openAbout() {
   } catch {}
 }
 function closeAbout() { $('aboutModal').classList.add('hidden'); }
+async function openOnboarding(force = false) {
+  if (!force && localStorage.getItem('cfm.onboardSkipped') === '1') return;
+  $('obStep1').classList.remove('hidden');
+  $('obStep2').classList.add('hidden');
+  $('obStatus').textContent = '';
+  $('obStatus').className = 'ob-status';
+  $('onboardModal').classList.remove('hidden');
+  if (OB) { renderObProviders(); return; }
+  try {
+    OB = await api('/api/onboarding');
+    renderObProviders();
+  } catch (e) {
+    $('obStatus').className = 'ob-status err';
+    $('obStatus').textContent = '读取供应商失败: ' + e.message;
+  }
+}
+function renderObProviders() {
+  const box = $('obStep1');
+  box.innerHTML = (OB?.presets || []).map((p) =>
+    '<div class="ob-provider" onclick="obPick(\'' + esc(p.id) + '\')">' +
+    '<div class="name">' + esc(p.name) + (p.recommended ? ' <span class="rec">推荐</span>' : '') + '</div>' +
+    '<div class="url">' + esc(p.baseUrl || '自定义端点') + '</div></div>'
+  ).join('');
+}
+function obPick(id) {
+  const p = (OB?.presets || []).find((x) => x.id === id);
+  if (!p) return;
+  OB.selected = p;
+  $('obName').textContent = p.name;
+  $('obModel').innerHTML = (p.models || []).map((m) => '<option value="' + esc(m.id) + '">' + esc(m.name || m.id) + '</option>').join('') || '<option value="">自定义</option>';
+  $('obCustom').classList.toggle('hidden', id !== 'openai-compatible');
+  $('obKey').value = '';
+  $('obStatus').textContent = '';
+  $('obStatus').className = 'ob-status';
+  $('obStep1').classList.add('hidden');
+  $('obStep2').classList.remove('hidden');
+  $('obKey').focus();
+}
+function obBack() { $('obStep2').classList.add('hidden'); $('obStep1').classList.remove('hidden'); }
+function obSkip() { $('onboardModal').classList.add('hidden'); localStorage.setItem('cfm.onboardSkipped', '1'); }
+async function obSubmit() {
+  const p = OB?.selected;
+  if (!p) return;
+  const key = $('obKey').value.trim();
+  const model = $('obModel').value;
+  const baseUrl = $('obBase').value.trim() || undefined;
+  if (!key) { $('obStatus').className = 'ob-status err'; $('obStatus').textContent = '请填写 API key'; return; }
+  const btn = $('obGo');
+  btn.disabled = true; btn.textContent = '测试中…';
+  $('obStatus').className = 'ob-status'; $('obStatus').textContent = '正在直连供应商测试 /responses …';
+  try {
+    const body = { presetId: p.id, key, model, baseUrl };
+    const t = await api('/api/onboarding/test', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    if (!t.responses?.ok) throw new Error('/responses 返回 ' + (t.responses?.status ?? '未知') + '，该端点不支持 Codex 所需的 Responses API');
+    $('obStatus').className = 'ob-status ok';
+    $('obStatus').textContent = '连通 ✓ /models ' + (t.models?.status ?? '?') + ' · /responses ' + t.responses.status + '，正在保存…';
+    const r = await api('/api/onboarding/apply', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...body, effort: 'medium' }) });
+    $('obStatus').textContent = '已保存：' + r.model + '（' + r.provider + '），正在进入…';
+    $('obKey').value = '';
+    localStorage.removeItem('cfm.onboardSkipped');
+    setTimeout(() => { $('onboardModal').classList.add('hidden'); load(); }, 700);
+  } catch (e) {
+    $('obStatus').className = 'ob-status err';
+    $('obStatus').textContent = e.message;
+  } finally { btn.disabled = false; btn.textContent = '测试并保存'; }
+}
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAbout(); });
 async function api(url, opts) { const r = await fetch(url, opts); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }
 function tab(name) {
@@ -221,6 +328,7 @@ async function load() {
     $('s-size').textContent = s.storage.total;
     $('s-skills').textContent = s.skills.count;
     $('lib-path').textContent = s.library.root || '';
+    if (s.onboarding && !s.onboarding.configured) openOnboarding();
   } catch (e) { toast('加载失败: ' + e.message); }
   try { LIB = await api('/api/library'); renderProjects(); renderConvs(); }
   catch (e) { toast('本地库读取失败: ' + e.message); }
@@ -270,13 +378,14 @@ async function exportLib() {
 async function loadProviders() {
   try {
     const j = await api('/api/providers');
-    $('provider-list').innerHTML = j.providers.length ? j.providers.map(p =>
+    const addCard = '<div class="provider"><h3>接入新模型</h3><div class="kv">DeepSeek / Qwen / Kimi / GLM / MiniMax / 自定义端点</div><div class="row" style="margin-top:8px"><button class="primary" onclick="openOnboarding(true)">开始接入</button></div></div>';
+    $('provider-list').innerHTML = addCard + (j.providers.length ? j.providers.map(p =>
       '<div class="provider"><h3>' + esc(p.name) + ' <span class="tag ' + (p.hasKey ? 'ok' : 'warn') + '">' + (p.hasKey ? 'key 已保存' : '无 key') + '</span></h3>' +
       '<div class="kv">' + esc(p.id) + ' · ' + esc(p.baseUrl) + '</div>' +
       '<div class="kv">模型：' + p.models.map(m => '<span class="chip">' + esc(m) + '</span>').join(' ') + '</div>' +
       '<div class="row" style="margin-top:8px"><button onclick="testProvider(\'' + esc(p.id) + '\')">测试连接</button>' +
       '<button onclick="useProvider(\'' + esc(p.id) + '\')" class="primary">设为默认</button></div></div>'
-    ).join('') : '<div class="empty">还没有注册供应商。终端运行 cfm providers add deepseek</div>';
+    ).join('') : '');
   } catch (e) { toast(e.message); }
 }
 async function testProvider(id) { try { const r = await api('/api/providers/test', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({id})}); toast('HTTP ' + r.status + ' · ' + (r.modelCount ?? '?') + ' 个模型'); } catch (e) { toast('测试失败: ' + e.message); } }
