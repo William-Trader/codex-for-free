@@ -1,4 +1,4 @@
-# Codex for Free · v1.0
+# Codex for Free · macOS
 
 **给不想碰终端的人：一个图形化的 Codex 入口。**
 
@@ -6,6 +6,12 @@
 不需要记命令，不需要翻 `~/.codex` 里散落的 JSONL。
 
 <p align="center"><b>Powered by William</b></p>
+
+## 平台支持
+
+- **本仓库当前发布的是 macOS 版本**，功能与更新优先。
+- **Windows 版本将在几天内推出**；发布后，Windows 版本的更新节奏会慢于 macOS。
+- macOS 版本会继续作为主平台，优先获得新功能、兼容性修复与模型接入更新。
 
 ## 30 秒开始（小白版）
 
