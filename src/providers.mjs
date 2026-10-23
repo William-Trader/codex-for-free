@@ -4,7 +4,7 @@ import {
   CONFIG_PATH, REGISTRY_PATH, SECRETS_DIR, CATALOG_DIR, CFM_HOME
 } from './paths.mjs';
 import { readJson, writeJson, ensureDir, redact } from './util.mjs';
-import { setRootKeys, upsertBlock, tomlTable, withoutRootKeys } from './toml-block.mjs';
+import { setRootKeys, upsertBlock, tomlTable, withoutRootKeys, withoutTable } from './toml-block.mjs';
 import { buildCatalog } from './catalog.mjs';
 
 export const PRESETS = {
@@ -107,6 +107,46 @@ export function parseModels(input) {
   }));
 }
 
+// Pull real limits and effort levels from the provider's /models endpoint so the
+// catalog never under-declares context or offers an effort the API rejects.
+export async function syncProviderModels(id, fetchImpl = fetch) {
+  const reg = loadRegistry();
+  const provider = reg.providers[id];
+  if (!provider) throw new Error(`provider not registered: ${id}`);
+  const key = readSecret(id);
+  const headers = { 'content-type': 'application/json' };
+  if (key) headers.authorization = 'Bearer ' + key;
+  const res = await fetchImpl(provider.baseUrl.replace(/\/$/, '') + '/models', {
+    headers, signal: AbortSignal.timeout(15000)
+  });
+  if (!res.ok) throw new Error(`/models HTTP ${res.status}`);
+  const body = await res.json();
+  const remote = new Map((body.data || []).map((m) => [m.id, m]));
+  let changed = 0;
+  const models = provider.models.map((local) => {
+    const r = remote.get(local.id);
+    if (!r) return local;
+    const levels = r.effort?.supported_levels;
+    const next = {
+      ...local,
+      name: r.name || local.name,
+      context: r.context_window || local.context,
+      maxContext: r.context_window || local.context,
+      maxOutput: r.max_output_tokens || local.maxOutput,
+      inputModalities: r.input_modalities || local.inputModalities,
+      defaultEffort: r.effort?.default_level || local.defaultEffort,
+      reasoning: Array.isArray(levels) && levels.length ? levels : local.reasoning
+    };
+    if (JSON.stringify(next) !== JSON.stringify(local)) changed += 1;
+    return next;
+  });
+  provider.models = models;
+  provider.syncedAt = new Date().toISOString();
+  reg.providers[id] = provider;
+  saveRegistry(reg);
+  return { id, changed, models };
+}
+
 export function addProvider({ presetId, id, baseUrl, models, key }) {
   const preset = PRESETS[presetId];
   if (!preset) throw new Error(`unknown preset: ${presetId}`);
@@ -148,12 +188,18 @@ export function useProvider(id, { model, effort } = {}) {
   if (!provider) throw new Error(`provider not registered: ${id}`);
   const chosen = model || provider.models[0]?.id;
   if (!chosen) throw new Error('provider has no models');
+  const entry = provider.models.find((m) => m.id === chosen);
+  const allowed = entry?.reasoning?.length ? entry.reasoning : ['low', 'medium', 'high'];
+  if (effort && !allowed.includes(effort)) {
+    throw new Error(`effort ${effort} 不被 ${chosen} 支持；可选: ${allowed.join('|')}`);
+  }
+  const effortValue = effort || entry?.defaultEffort || (allowed.includes('high') ? 'high' : allowed[allowed.length - 1]);
   const cat = buildCatalog(id, provider.models);
   let cfg = '';
   try { cfg = fs.readFileSync(CONFIG_PATH, 'utf8'); } catch {}
+  cfg = withoutTable(cfg, `model_providers.${id}`);
   cfg = upsertBlock(cfg, `provider:${id}`, providerToml(provider));
   cfg = withoutRootKeys(cfg, ['model_context_window', 'model_max_output_tokens']);
-  const effortValue = effort || 'medium';
   cfg = setRootKeys(cfg, {
     model: chosen,
     model_provider: id,

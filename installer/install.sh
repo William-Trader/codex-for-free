@@ -99,14 +99,14 @@ text = re.sub(r"# >>> cfm:login-bypass[\s\S]*?# <<< cfm:login-bypass\n?", "", ol
 for name in ("model", "model_provider", "model_catalog_json", "model_reasoning_effort"):
     text = re.sub(rf"^{name}\s*=.*\n?", "", text, flags=re.M)
 text = re.sub(r"\[model_providers\.deepseek\][\s\S]*?(?=\n\[|\Z)", "", text).rstrip()
-text = re.sub(r"(?m)^enabled-reasoning-efforts\s*=.*$", 'enabled-reasoning-efforts = ["low", "medium", "high"]', text)
+text = re.sub(r"(?m)^enabled-reasoning-efforts\s*=.*$", 'enabled-reasoning-efforts = ["low", "high", "max"]', text)
 
 block = (
     "# >>> cfm:login-bypass\n"
     'model = "deepseek-v4-pro"\n'
     'model_provider = "deepseek"\n'
     f'model_catalog_json = "{catalog}"\n'
-    'model_reasoning_effort = "medium"\n'
+    'model_reasoning_effort = "high"\n'
     "# <<< cfm:login-bypass\n\n"
 )
 provider = (

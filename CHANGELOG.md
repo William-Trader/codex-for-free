@@ -1,3 +1,12 @@
+## v1.2.0 — DeepSeek 能力对齐
+
+- catalog 按 /models 真实声明上下文 1,048,576、输出 393,216、模态
+- reasoning 档位改为 low/high/max，默认 high
+- 修复 providers use 写出重复根键与重复 provider 表（非法 TOML）
+- 截断上限按上下文自适应
+- cfm codex 参数全量透传
+- 新增 providers sync；README 增加真实任务测评
+
 ## v1.1.3 — 实际使用修复
 
 - CLI 安装到 PATH（cfm install-cli + 安装器链接）

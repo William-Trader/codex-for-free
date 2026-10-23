@@ -14,7 +14,7 @@ import {
 import { listSkills } from './skills.mjs';
 import {
   PRESETS, addProvider, useProvider, listProviders, testProvider,
-  loadRegistry, hasSecret, secretPath, parseModels, readSecret
+  loadRegistry, hasSecret, secretPath, parseModels, readSecret, syncProviderModels
 } from './providers.mjs';
 import { buildCatalog } from './catalog.mjs';
 import { checkForUpdates, updateNow } from './update.mjs';
@@ -345,6 +345,13 @@ async function openPanel(port, target = '/?view=panel') {
 
 export async function main(argv) {
   const [cmd, ...rest] = argv;
+  // `cfm codex ...` is a passthrough: every flag belongs to the Codex CLI.
+  if (cmd === 'codex') {
+    const bin = locateCodex();
+    if (!bin) throw new Error('未找到 Codex CLI；设置 CODEX_BIN 或安装 Codex');
+    const r = spawnSync(bin, rest, { stdio: 'inherit', env: { ...process.env, CODEX_HOME } });
+    process.exit(r.status ?? 0);
+  }
   const flags = parseArgs(rest);
   const wantJson = !!flags.json;
 
@@ -573,6 +580,26 @@ export async function main(argv) {
       out(`目录: ${r.catalog.path}（${r.catalog.count} 个模型）`);
       return;
     }
+    if (sub === 'sync') {
+      const id = flags._[1];
+      const targets = id ? [id] : listProviders().map((p) => p.id);
+      const results = [];
+      for (const pid of targets) {
+        try {
+          const r = await syncProviderModels(pid);
+          results.push({ id: pid, changed: r.changed, models: r.models.map((m) => ({ id: m.id, context: m.context, reasoning: m.reasoning, default: m.defaultEffort })) });
+        } catch (e) {
+          results.push({ id: pid, error: e.message });
+        }
+      }
+      if (wantJson) return jsonOut(results);
+      for (const r of results) {
+        if (r.error) { out(`${r.id}: ! ${r.error}`); continue; }
+        out(`${r.id}: ${r.models.length} 个模型（更新 ${r.changed}）`);
+        for (const m of r.models) out(`  ${m.id} · ctx=${m.context} · effort=${(m.reasoning || []).join('|')} · 默认=${m.default || '?'}`);
+      }
+      return;
+    }
     if (sub === 'current' || sub === 'status') {
       const c = configSummary();
       if (wantJson) return jsonOut({ ...c, config: CONFIG_PATH });
@@ -619,7 +646,11 @@ export async function main(argv) {
       const reg = loadRegistry();
       const p = reg.providers[id];
       if (!p) throw new Error('未注册: ' + id);
-      const r = buildCatalog(id, p.models);
+      let models = p.models;
+      if (!flags['no-sync']) {
+        try { models = (await syncProviderModels(id)).models; } catch {}
+      }
+      const r = buildCatalog(id, models);
       out(`已生成 ${r.path}（${r.count} 个模型，来源 ${r.source}）`);
       return;
     }
@@ -677,13 +708,6 @@ export async function main(argv) {
     out('备份: ' + r.backup);
     out(r.hasCfm ? '! 仍检测到 CFM 标记，请检查配置' : '官方配置已干净，重启 Codex 应用生效');
     return;
-  }
-
-  if (cmd === 'codex') {
-    const bin = locateCodex();
-    if (!bin) throw new Error('未找到 Codex CLI；设置 CODEX_BIN 或安装 Codex');
-    const r = spawnSync(bin, rest, { stdio: 'inherit', env: { ...process.env, CODEX_HOME } });
-    process.exit(r.status ?? 0);
   }
 
   if (cmd === 'ui') {

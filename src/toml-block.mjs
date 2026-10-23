@@ -46,9 +46,48 @@ export function withoutRootKeys(text, keys) {
   return out.join('\n');
 }
 
+// Drop a key even when it sits inside one of our managed blocks, so the same
+// root key is never declared twice (duplicate keys make the file invalid TOML).
+function withoutManagedKeys(text, keys) {
+  const wanted = new Set(keys);
+  const out = [];
+  let inManaged = false;
+  for (const line of String(text || '').split('\n')) {
+    const t = line.trim();
+    if (t.startsWith('# >>> cfm:')) { inManaged = true; out.push(line); continue; }
+    if (t.startsWith('# <<< cfm:')) { inManaged = false; out.push(line); continue; }
+    if (inManaged) {
+      const m = t.match(/^([A-Za-z0-9_.-]+)\s*=/);
+      if (m && wanted.has(m[1])) continue;
+    }
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
+// Remove a bare [table] (and body) that is not inside a managed block. Used to
+// clear a provider table written by the installer before writing ours, because a
+// table declared twice is invalid TOML.
+export function withoutTable(text, header) {
+  const want = `[${header}]`;
+  const out = [];
+  let skip = false;
+  let inManaged = false;
+  for (const line of String(text || '').split('\n')) {
+    const t = line.trim();
+    if (t.startsWith('# >>> cfm:')) inManaged = true;
+    if (t.startsWith('# <<< cfm:')) { inManaged = false; skip = false; out.push(line); continue; }
+    if (!inManaged && t === want) { skip = true; continue; }
+    if (skip && !inManaged && /^\[/.test(t)) skip = false;
+    if (!skip) out.push(line);
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n');
+}
+
 export function setRootKeys(text, entries) {
   const keys = Object.keys(entries);
   let src = withoutRootKeys(text, keys);
+  src = withoutManagedKeys(src, keys);
   // drop an existing defaults block so key order stays deterministic
   src = removeBlock(src, 'defaults');
   const body = keys.map((k) => `${k} = ${tomlValue(entries[k])}`).join('\n');

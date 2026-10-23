@@ -14,7 +14,7 @@
 ### 使用 GPT 前端
 
 1. 安装官方 ChatGPT macOS 应用
-2. 下载 Release 里的 `Codex-for-Free-1.1.3-Installer.zip`
+2. 下载 Release 里的 `Codex-for-Free-1.2.0-Installer.zip`
 3. 解压后双击 `Install Codex for Free.command`
 4. 输入自己的 DeepSeek API key
 
@@ -125,12 +125,57 @@ model_catalog_json = "~/.codex-for-mac/catalog/deepseek.json"
 
 ```bash
 cfm providers list
+cfm providers sync deepseek        # 从 /models 拉真实上下文长度与 reasoning 档位
 cfm providers test deepseek
-cfm providers use deepseek --model deepseek-v4-pro --effort medium
+cfm providers use deepseek --model deepseek-flash --effort high
 cfm panel
 ```
 
 API key 只保存在本机 0600 文件或 `~/.codex/config.toml` 的请求头里，不进入仓库、日志或回复。
+
+### 模型目录必须和供应商对齐
+
+DeepSeek 的实际能力（`GET /models`，2026-10-24）：
+
+| 项 | deepseek-flash | deepseek-v4-pro |
+|---|---|---|
+| 上下文 | 1,048,576 | 1,048,576 |
+| 最大输出 | 393,216 | 393,216 |
+| reasoning 档位 | low / high / max（默认 high） | low / high / max（默认 high） |
+| 输入模态 | text + image | text |
+
+早期目录把上下文写成 131,072、档位写成 `low/medium/high`，导致上下文被提前截断、`medium` 是一个 API 不认的档位。现在 `cfm providers sync` 会把真实值写回注册表，`cfm catalog build` 据此重建目录，`cfm providers use` 会拒绝供应商不支持的 effort。
+
+## DeepSeek 在 Codex 里的实际表现
+
+以下是 2026-10-24 在本机实际跑出来的结果，`codex-cli 0.163.0-alpha.11.2` + `deepseek-flash` + effort `high`，全部为真实执行、非模拟：
+
+| # | 任务 | 耗时 | 结果 |
+|---|---|---:|---|
+| T1 | 单轮问答（复式记账） | 2.1s | 正确，未误调工具 |
+| T2 | 读文件定位 bug | 4.0s | 指出第 2 行 `a - b`，未修改文件 |
+| T3 | 改文件 + 运行验证 | 16.2s | 只改一行，实跑输出 5 |
+| T4 | 新建脚本 + 管道运行 | 8.9s | 脚本正确，贴出的输出与实跑一致 |
+| T5 | 请求不存在的文件 | 8.0s | 先探测再明确报缺失，没有编造内容 |
+| T8 | 180 KB / 4000 行长文件定位 | 8.8s | 命中第 3124 行，未整文件硬读 |
+| T9 | 多文件重构 + 测试 | 15.3s | 改 `util.py` + 补断言，`python3 test_app.py` 通过 |
+| T10 | 两路并发 | 6.6s / 11.4s | 两路都正确，互不干扰 |
+
+reasoning 档位实测（同一道可验证的算术题）：
+
+| effort | tokens | 耗时 | 正确 |
+|---|---:|---:|---|
+| low | 447 | 7.0s | 是 |
+| high | 452 | 6.7s | 是 |
+| max | 11,513 | 8.9s | 是 |
+
+结论：**effort 确实传到了 API**（max 的思考 token 是 low 的 25 倍），但在这种题上不改变答案，只增加成本。日常用 `high`；只有难题再上 `max`。
+
+任务质量判断：
+
+- **可靠**：读写文件、单点修复、跑命令验证、按关键词检索、单文件重构、并发短任务。全程没有出现工具调用死循环，也没有伪造执行结果（T4 贴的输出与实跑一致，T5 明确说文件不存在）。
+- **需要注意**：它会严格按字面实现需求。T9 里要求的“空格或下划线”被实现为 `[ _]+`，连字符不在其中，所以 `A_-_B` → `a---b`。这不是 bug，是需求没写全；给它更明确的规格即可。
+- **未验证**：超大仓库（数千文件）全局重构、长时间多轮会话的上下文稳定性、图像理解（`deepseek-flash` 声明支持图片输入，但本项目未做图像链路测试）。
 
 ## 边界
 
