@@ -138,7 +138,7 @@ export function createServer() {
           }))
         });
       }
-      if (req.method === 'GET' && u.pathname === '/api/about') return json(res, 200, { ...PROFILE, app: { name: 'Codex for Mac', version: pkg.version, repo: PROFILE.repo } });
+      if (req.method === 'GET' && u.pathname === '/api/about') return json(res, 200, { ...PROFILE, app: { name: 'Codex for Free', version: pkg.version, repo: PROFILE.repo } });
       if (req.method === 'GET' && u.pathname === '/api/library') return json(res, 200, readLibrary());
       if (req.method === 'GET' && u.pathname === '/api/conversation') {
         const rel = u.searchParams.get('rel');

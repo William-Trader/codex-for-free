@@ -1,10 +1,11 @@
 {
-  "name": "codex-for-mac",
-  "version": "1.0.1",
-  "description": "Codex for Mac v1 — 给不想用终端的人：图形化 Codex 前端、本地对话/项目库、多家模型接入。Powered by William.",
+  "name": "codex-for-free",
+  "version": "1.0.2",
+  "description": "Codex for Free v1.0.2 — 给不想用终端的人：图形化 Codex 前端、本地对话/项目库、多家模型接入。Powered by William.",
   "type": "module",
   "bin": {
-    "cfm": "bin/cfm.mjs"
+    "cfm": "bin/cfm.mjs",
+    "cff": "bin/cfm.mjs"
   },
   "engines": {
     "node": ">=24"
@@ -16,9 +17,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/William-Trader/codex-for-mac.git"
+    "url": "git+https://github.com/William-Trader/codex-for-free.git"
   },
-  "homepage": "https://github.com/William-Trader/codex-for-mac",
+  "homepage": "https://github.com/William-Trader/codex-for-free",
   "keywords": [
     "codex",
     "macos",

@@ -2,7 +2,7 @@
 
 ## 原理
 
-codex-for-mac 只改 `~/.codex/config.toml` 的两个受控区域：
+codex-for-free 只改 `~/.codex/config.toml` 的两个受控区域：
 
 ```toml
 # >>> cfm:defaults

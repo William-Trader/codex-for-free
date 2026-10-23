@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Codex for Mac</title>
+<title>Codex for Free</title>
 <style>
 :root{--bg:#0b0d10;--panel:#12151b;--panel2:#171b23;--line:#242a35;--text:#e7eaf0;--muted:#8b93a3;--accent:#7c9cff;--green:#3ddc97;--amber:#f5b84b;--red:#ff6b6b}
 *{box-sizing:border-box}
@@ -35,6 +35,10 @@ main{padding:18px 20px 40px;max-width:1500px;margin:0 auto}
 .item.active{background:var(--panel2);border-color:#31405c}
 .item .t{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .item .m{color:var(--muted);font-size:11px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"t c" "m m";column-gap:8px}
+.item .t{grid-area:t}
+.item .m{grid-area:m}
+.item .count{grid-area:c;margin:0;align-self:start}
 .count{margin-left:auto;color:var(--muted);font-size:11px}
 .preview{padding:18px 22px;max-height:640px;overflow:auto}
 .preview pre{white-space:pre-wrap;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:#cdd4e3}
@@ -98,12 +102,39 @@ main{padding:18px 20px 40px;max-width:1500px;margin:0 auto}
 .ob-back{background:transparent;border:0;color:var(--muted);padding:0;margin-bottom:10px;cursor:pointer}
 .onboard-card h3{font-size:16px;margin:4px 0 8px}
 @media(max-width:980px){.cards{grid-template-columns:repeat(2,1fr)}.split{grid-template-columns:1fr}.providers{grid-template-columns:1fr}}
+
+/* ChatGPT-style refinement */
+:root{--bg:#212121;--panel:#2a2a2a;--panel2:#303030;--line:#3d3d3d;--text:#ececec;--muted:#b4b4b4;--accent:#10a37f;--green:#10a37f;--amber:#f5b84b;--red:#ff7a7a}
+body{background:#212121;color:#ececec;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Segoe UI",sans-serif}
+header{background:rgba(33,33,33,.92);border-bottom-color:#2a2a2a}
+.logo{background:#ececec;color:#171717;border-radius:8px}
+button{border-radius:999px;border-color:#3d3d3d;background:transparent}
+button:hover{background:#2a2a2a}
+button.primary{background:#10a37f;border-color:#10a37f;color:#fff}
+button.primary:hover{background:#0e8f70}
+.tab{border-radius:8px}
+.tab.active{background:#2a2a2a;border-color:#3d3d3d}
+.card{background:#2a2a2a;border-color:#2f2f2f;border-radius:14px}
+.panel{background:#2a2a2a;border-color:#2f2f2f;border-radius:16px}
+.panel .hd{border-bottom-color:#2f2f2f;color:#b4b4b4}
+.item:hover{background:#303030}
+.item.active{background:#303030;border-color:#474747}
+.preview pre{color:#d6d6d6}
+.provider{background:#2a2a2a;border-color:#2f2f2f;border-radius:14px}
+.tag.ok{color:#10a37f;border-color:#1f4a3a}
+.modal{background:rgba(0,0,0,.6)}
+.about-card,.onboard-card{background:#2a2a2a;border-color:#3d3d3d}
+.about-links a,.links a{color:#10a37f}
+.about-card h2,.onboard-card h2,.onboard-card h3{font-weight:600}
+.ob-provider{background:#212121;border-color:#3d3d3d}
+.ob-field input,.ob-field select{background:#1b1b1b;border-color:#3d3d3d}
+.welcome{background:#2a2a2a;border-color:#2f2f2f}
 </style>
 </head>
 <body>
 <header>
   <div class="logo">C</div>
-  <div><h1>Codex for Mac</h1><div class="sub" id="ver">自主模型扩展 · 本地对话库</div></div>
+  <div><h1>Codex for Free</h1><div class="sub" id="ver">本地对话与项目</div></div>
   <div class="grow"></div>
   <button onclick="exportLib()" class="primary">导出全部对话</button>
   <button onclick="openDir('')">在 Finder 打开</button>
@@ -119,9 +150,9 @@ main{padding:18px 20px 40px;max-width:1500px;margin:0 auto}
 
   <div class="tabs">
     <div class="tab active" data-tab="chat" onclick="tab('chat')">对话</div>
-    <div class="tab" data-tab="providers" onclick="tab('providers')">模型供应商</div>
+    <div class="tab" data-tab="providers" onclick="tab('providers')">模型</div>
     <div class="tab" data-tab="storage" onclick="tab('storage')">存储</div>
-    <div class="tab" data-tab="ext" onclick="tab('ext')">扩展 / Skills</div>
+    <div class="tab" data-tab="ext" onclick="tab('ext')">扩展</div>
   </div>
 
   <section id="tab-chat">
@@ -183,7 +214,7 @@ main{padding:18px 20px 40px;max-width:1500px;margin:0 auto}
       <div class="ob-field"><label>API Key</label><input id="obKey" type="password" placeholder="粘贴 API key" autocomplete="off" spellcheck="false"></div>
       <div class="ob-field"><label>模型</label><select id="obModel"></select></div>
       <div class="ob-field hidden" id="obCustom"><label>Base URL</label><input id="obBase" placeholder="https://your-endpoint/v1" autocomplete="off" spellcheck="false"></div>
-      <div class="ob-note">🔒 key 只保存在 ~/.codex-for-mac/secrets/（0600）。测试只直接请求你填写的供应商；面板不记录、不回显 key。</div>
+      <div class="ob-note">密钥仅保存在本机 secrets 目录（仅当前用户可读）。测试会直接请求你填写的服务商，不经过本面板。</div>
       <div class="row"><button class="primary" id="obGo" onclick="obSubmit()">测试并保存</button><button class="ghost" onclick="obSkip()">稍后</button></div>
       <div class="ob-status" id="obStatus"></div>
     </div>
@@ -193,7 +224,7 @@ main{padding:18px 20px 40px;max-width:1500px;margin:0 auto}
   <div class="about-card">
     <button class="modal-close" onclick="closeAbout()" aria-label="关闭">×</button>
     <img class="about-avatar" src="/avatar.svg" alt="William">
-    <h2>Codex for Mac</h2>
+    <h2>Codex for Free</h2>
     <div class="about-powered">Powered by <b id="about-name">William</b></div>
     <div class="about-version" id="about-version">v1.0.0</div>
     <div class="about-date" id="about-date"></div>
@@ -219,8 +250,8 @@ function toast(msg) { const el = $('toast'); el.textContent = msg; el.classList.
 function welcomeHTML() {
   return [
     '<div class="welcome">',
-    '<h2>欢迎使用 Codex for Mac</h2>',
-    '<p>给不想碰终端的人用的 Codex 前端。三步开始：</p>',
+    '<h2>欢迎使用 Codex for Free</h2>',
+    '<p>从项目到对话，都整理在本地。三步开始：</p>',
     '<ol>',
     '<li>点右上角「导出全部对话」，把现有 Codex 记录变成可浏览的项目文件夹。</li>',
     '<li>在「模型供应商」接入 DeepSeek / Qwen，或继续用官方 Codex 配置。</li>',
@@ -322,7 +353,8 @@ function tab(name) {
 async function load() {
   try {
     const s = await api('/api/summary');
-    $('ver').textContent = 'v' + s.app.version + ' · Powered by William · ' + (s.codex.found ? 'Codex ' + (s.codex.version || '') : '未检测到 Codex');
+    const codexVer = (s.codex.version || '').replace(/^codex-cli\s*/i, '');
+    $('ver').textContent = 'v' + s.app.version + ' · Powered by William' + (codexVer ? ' · Codex CLI ' + codexVer : ' · 未检测到 Codex');
     $('s-conv').textContent = s.library.conversations ?? 0;
     $('s-proj').textContent = s.library.projects ?? 0;
     $('s-size').textContent = s.storage.total;

@@ -1,4 +1,4 @@
-# Codex for Mac · v1.0
+# Codex for Free · v1.0
 
 **给不想碰终端的人：一个图形化的 Codex 入口。**
 
@@ -10,13 +10,13 @@
 ## 30 秒开始（小白版）
 
 1. 安装 **Node.js 24**：<https://nodejs.org>
-2. 下载 Release 里的 `codex-for-mac-1.0.1.tgz`，或克隆本仓库
+2. 下载 Release 里的 `codex-for-free-1.0.2.tgz`，或克隆本仓库
 3. 任选一种启动方式：
 
 ```bash
 # A. 双击 start.command（macOS，最省事）
 # B. 终端安装
-npm i -g codex-for-mac-1.0.1.tgz
+npm i -g codex-for-free-1.0.2.tgz
 cfm ui
 ```
 
@@ -28,7 +28,7 @@ cfm ui
 
 v0.x 是能用的工具；v1 是给普通人的产品。
 
-| 以前的 Codex | Codex for Mac v1 |
+| 以前的 Codex | Codex for Free v1 |
 |---|---|
 | 只会在终端里跑 | 浏览器面板，点按钮就行 |
 | 对话散在 `~/.codex` | 按项目归档成 Markdown / JSON |
