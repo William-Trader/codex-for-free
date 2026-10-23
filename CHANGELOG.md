@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.6 — 2026-10-23
+
+- macOS 应用图标改为 ChatGPT 原生图形黑板化版本（黑底白线）。
+- 应用包与发布资产同步更新。
+
 ## 1.0.5 — 2026-10-23
 
 - 新增独立 macOS 应用包 Codex for Free.app，bundle id 独立，可与官方 Codex 并存。

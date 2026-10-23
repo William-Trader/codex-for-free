@@ -1,7 +1,7 @@
 {
   "name": "codex-for-free",
-  "version": "1.0.5",
-  "description": "Codex for Free v1.0.5 — 独立 macOS 图形应用，与官方 Codex 并存；本地对话/项目库、多家模型接入。Powered by William.",
+  "version": "1.0.6",
+  "description": "Codex for Free v1.0.6 — 独立 macOS 应用，黑板化 ChatGPT 图标，与官方 Codex 并存。",
   "type": "module",
   "bin": {
     "cfm": "bin/cfm.mjs",
