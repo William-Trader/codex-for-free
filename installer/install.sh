@@ -16,7 +16,7 @@ if [[ ! -d "$OFFICIAL" ]]; then
   exit 1
 fi
 
-KEY="${DEEPSEEK_API_KEY:-${CFM_DEEPSEEK_KEY:-}}"
+KEY="${CFM_KEY:-${DEEPSEEK_API_KEY:-${CFM_DEEPSEEK_KEY:-}}}"
 if [[ -z "$KEY" ]]; then
   printf "DeepSeek API key: "
   stty -echo
@@ -94,6 +94,7 @@ text = re.sub(r"# >>> cfm:login-bypass[\s\S]*?# <<< cfm:login-bypass\n?", "", ol
 for name in ("model", "model_provider", "model_catalog_json", "model_reasoning_effort"):
     text = re.sub(rf"^{name}\s*=.*\n?", "", text, flags=re.M)
 text = re.sub(r"\[model_providers\.deepseek\][\s\S]*?(?=\n\[|\Z)", "", text).rstrip()
+text = re.sub(r"(?m)^enabled-reasoning-efforts\s*=.*$", 'enabled-reasoning-efforts = ["low", "medium", "high"]', text)
 
 block = (
     "# >>> cfm:login-bypass\n"
@@ -108,7 +109,7 @@ provider = (
     'name = "DeepSeek"\n'
     'base_url = "https://api.deepseek.com/v1"\n'
     'wire_api = "responses"\n'
-    f'http_headers = {{ "Authorization" = "Bearer {key}" }}\n'
+    'http_headers = { "Authorization" = "Bearer ' + key + ' }\n'
 )
 cfg.write_text(block + text.strip() + provider)
 os.chmod(cfg, 0o600)

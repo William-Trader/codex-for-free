@@ -14,7 +14,7 @@
 ### 使用 GPT 前端
 
 1. 安装官方 ChatGPT macOS 应用
-2. 下载 Release 里的 `Codex-for-Free-1.1.0-Installer.zip`
+2. 下载 Release 里的 `Codex-for-Free-1.1.1-Installer.zip`
 3. 解压后双击 `Install Codex for Free.command`
 4. 输入自己的 DeepSeek API key
 
@@ -43,6 +43,21 @@ cfm providers list
 打开 Codex for Free 面板.command
 打开 Codex for Free 知识库.command
 ```
+
+### 维护命令
+
+```bash
+cfm search "关键词"          # 搜知识库 Markdown
+cfm backup                   # 备份 config + providers + 知识库
+cfm restore <archive> --yes  # 恢复备份（先备份当前状态）
+cfm repair                   # 官方 app 更新后重做改名与配置
+cfm uninstall --yes          # 移走 app，恢复官方配置
+cfm providers current        # 当前 provider / model
+cfm providers test           # 测全部 provider
+cfm completion zsh           # 输出 zsh 补全
+```
+
+`repair` 需要官方 `/Applications/ChatGPT.app` 存在；`uninstall` 只移动 app 并恢复配置，不删除知识库。
 
 ## 仓库结构
 

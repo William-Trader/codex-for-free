@@ -1,3 +1,9 @@
+## v1.1.1 — 维护工具补齐
+
+- search / backup / restore / repair / uninstall
+- doctor --json、providers current/test、completion
+- 安装器 key 与 reasoning 修复
+
 ## v1.1.0 — GPT 前端安装器
 
 - 新增 `installer/`：把官方 ChatGPT/Codex 前端本地安装为 Codex for Free

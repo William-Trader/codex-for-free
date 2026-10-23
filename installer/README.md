@@ -12,7 +12,7 @@
 
 ## 使用
 
-1. 解压 Release 里的 `Codex-for-Free-1.1.0-Installer.zip`
+1. 解压 Release 里的 `Codex-for-Free-1.1.1-Installer.zip`
 2. 双击 `Install Codex for Free.command`
 3. 按提示输入 DeepSeek API key
 4. 安装完成后会自动打开 **Codex for Free.app**

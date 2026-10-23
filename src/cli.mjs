@@ -3,7 +3,7 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
-  CODEX_HOME, OFFICIAL_CODEX_HOME, OFFICIAL_CONFIG_PATH, CFM_HOME, CONFIG_PATH, CFM_CONFIG_PATH, locateCodex
+  CODEX_HOME, OFFICIAL_CODEX_HOME, OFFICIAL_CONFIG_PATH, CFM_HOME, CONFIG_PATH, CFM_CONFIG_PATH, HOME, locateCodex
 } from './paths.mjs';
 import { officialHasCfm, restoreOfficialConfig } from './isolate.mjs';
 import { fmtBytes, platform, redact } from './util.mjs';
@@ -19,6 +19,7 @@ import {
 import { buildCatalog } from './catalog.mjs';
 import { checkForUpdates, updateNow } from './update.mjs';
 import { startServer } from './server.mjs';
+import { searchLibrary, createBackup, restoreBackup } from './maintenance.mjs';
 
 const pkg = JSON.parse(fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'));
 
@@ -163,6 +164,115 @@ function printLibrary(idx) {
   }
 }
 
+const APP_PATH = process.env.CFM_APP_PATH || '/Applications/Codex for Free.app';
+
+function configSummary() {
+  try {
+    const s = fs.readFileSync(CONFIG_PATH, 'utf8');
+    return {
+      model: (s.match(/^model\s*=\s*"([^"]+)"/m) || [])[1] || null,
+      provider: (s.match(/^model_provider\s*=\s*"([^"]+)"/m) || [])[1] || null
+    };
+  } catch { return { model: null, provider: null }; }
+}
+
+function keyFromConfig() {
+  try {
+    const s = fs.readFileSync(CONFIG_PATH, 'utf8');
+    return (s.match(/Authorization\s*=\s*"Bearer\s+([^"]+)"/) || [])[1] || '';
+  } catch { return ''; }
+}
+
+async function doctorJson() {
+  const bin = locateCodex();
+  const app = APP_PATH;
+  const cfg = configSummary();
+  const checks = [];
+  let appName = null;
+  let appVersion = null;
+  let codexVersion = null;
+  if (fs.existsSync(app)) {
+    const n = spawnSync('/usr/libexec/PlistBuddy', ['-c', 'Print :CFBundleDisplayName', path.join(app, 'Contents/Info.plist')], { encoding: 'utf8' });
+    const v = spawnSync('/usr/libexec/PlistBuddy', ['-c', 'Print :CFBundleShortVersionString', path.join(app, 'Contents/Info.plist')], { encoding: 'utf8' });
+    appName = (n.stdout || '').trim() || null;
+    appVersion = (v.stdout || '').trim() || null;
+  } else checks.push({ level: 'error', id: 'app', message: 'Codex for Free.app not found' });
+  if (bin) {
+    const v = spawnSync(bin, ['--version'], { encoding: 'utf8' });
+    codexVersion = (v.stdout || '').trim() || null;
+  } else checks.push({ level: 'error', id: 'codex', message: 'Codex CLI not found' });
+  let configMode = null;
+  try {
+    configMode = '0' + (fs.statSync(CONFIG_PATH).mode & 0o777).toString(8);
+    if ((fs.statSync(CONFIG_PATH).mode & 0o777) !== 0o600) checks.push({ level: 'warn', id: 'config-mode', message: 'config.toml mode is not 600' });
+  } catch { checks.push({ level: 'error', id: 'config', message: 'config.toml not found' }); }
+  let panel = false;
+  try {
+    const r = await fetch('http://127.0.0.1:4317/api/summary', { signal: AbortSignal.timeout(600) });
+    panel = r.ok;
+  } catch {}
+  if (!cfg.provider) checks.push({ level: 'warn', id: 'provider', message: 'model_provider is not set' });
+  const lib = libraryStats();
+  if (!lib.exists) checks.push({ level: 'warn', id: 'library', message: 'library index is missing' });
+  return {
+    ok: !checks.some((c) => c.level === 'error'),
+    version: pkg.version,
+    platform: platform(),
+    app: { path: app, exists: fs.existsSync(app), name: appName, version: appVersion },
+    codex: { path: bin, version: codexVersion },
+    config: { path: CONFIG_PATH, mode: configMode, model: cfg.model, provider: cfg.provider },
+    panel: { port: 4317, running: panel },
+    library: lib,
+    providers: listProviders(),
+    checks
+  };
+}
+
+function runRepair() {
+  const official = process.env.CHATGPT_APP || '/Applications/ChatGPT.app';
+  if (!fs.existsSync(official)) throw new Error('官方 ChatGPT.app 不存在；先安装或更新官方应用');
+  let key = '';
+  try { key = readSecret('deepseek'); } catch {}
+  if (!key) key = keyFromConfig();
+  if (!key) throw new Error('找不到 DeepSeek key；先运行 installer/install.sh');
+  const installer = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'installer', 'install.sh');
+  if (!fs.existsSync(installer)) throw new Error('installer/install.sh 不存在');
+  const r = spawnSync('zsh', [installer], { env: { ...process.env, CFM_KEY: key }, stdio: 'inherit' });
+  if (r.status !== 0) throw new Error('安装器修复失败，退出码 ' + r.status);
+  return { ok: true, app: APP_PATH, installer };
+}
+
+function runUninstall({ yes = false, keepConfig = false } = {}) {
+  if (!yes) throw new Error('uninstall requires --yes');
+  const app = APP_PATH;
+  let moved = null;
+  if (fs.existsSync(app)) {
+    const trash = path.join(HOME, '.Trash');
+    fs.mkdirSync(trash, { recursive: true });
+    const dest = path.join(trash, `Codex for Free.app-${new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 15)}`);
+    try { fs.renameSync(app, dest); moved = dest; }
+    catch {
+      const r = spawnSync('trash', [app], { encoding: 'utf8' });
+      if (r.status !== 0) throw new Error((r.stderr || 'cannot move app to Trash').trim());
+    }
+  }
+  let restored = null;
+  if (!keepConfig) {
+    try {
+      const dir = path.dirname(CONFIG_PATH);
+      const backups = fs.readdirSync(dir).filter((n) => n.startsWith('config.toml.bak-login-')).sort();
+      if (backups.length) {
+        const latest = path.join(dir, backups[backups.length - 1]);
+        if (fs.existsSync(CONFIG_PATH)) fs.copyFileSync(CONFIG_PATH, path.join(dir, 'config.toml.bak-uninstall-' + Date.now()));
+        fs.copyFileSync(latest, CONFIG_PATH);
+        fs.chmodSync(CONFIG_PATH, 0o600);
+        restored = latest;
+      }
+    } catch {}
+  }
+  return { ok: true, moved, restored };
+}
+
 async function openPanel(port, target = '/?view=panel') {
   const base = `http://127.0.0.1:${port}`;
   try {
@@ -184,7 +294,12 @@ export async function main(argv) {
     out(`codex-for-mac v${pkg.version} — 自主模型扩展 + 本地对话库
 
 用法:
-  cfm doctor                         体检（环境/存储/扩展/供应商）
+  cfm doctor [--json]                体检（环境/存储/扩展/供应商）
+  cfm search <关键词> [--json] [--all] [--limit N] 搜索本地知识库
+  cfm backup [--out FILE]            备份 config / providers / 知识库
+  cfm restore <archive> --yes        恢复备份（先备份当前状态）
+  cfm repair                         官方 app 更新后重做改名与配置
+  cfm uninstall --yes [--keep-config] 移走 app 并恢复官方配置
   cfm storage report                 本地存储占用
   cfm storage vacuum [--apply]       压缩 SQLite（WAL checkpoint + VACUUM）
   cfm storage archive --days 90 [--apply]  归档旧会话（只移不删）
@@ -197,12 +312,14 @@ export async function main(argv) {
   cfm providers list                 已注册模型供应商
   cfm providers add <preset>         添加供应商（deepseek|qwen|kimi|zhipu|minimax|openai-compatible）
   cfm providers use <id> [--model M] [--effort low|medium|high|max]
-  cfm providers test <id>            测试 base_url + key
+  cfm providers current              查看当前 provider / model
+  cfm providers test [id]            测试 base_url + key（省略 id 测试全部）
   cfm catalog build <id>             重新生成模型目录
   cfm codex [...args]                用当前配置启动官方 Codex CLI
   cfm ui [--port 4317]               启动本地面板（默认打开对话端）
   cfm panel                           只打开管理面板
   cfm knowledge                       打开本地知识库（对话/项目文件）
+  cfm completion [zsh|bash]          输出命令补全
   cfm restore-official                从官方 config.toml 移除 CFM 修改
   cfm check                           检查更新
   cfm update                          安装最新版（npm -g codex-for-free@latest）
@@ -214,7 +331,62 @@ export async function main(argv) {
 
   if (cmd === 'version' || flags.version) { out(pkg.version); return; }
 
-  if (cmd === 'doctor') { if (wantJson) return jsonOut({ report: storageReport(), library: libraryStats(), skills: listSkills(), providers: listProviders(), codex: locateCodex(), platform: platform() }); printDoctor(); return; }
+  if (cmd === 'doctor') {
+    if (wantJson) return jsonOut(await doctorJson());
+    printDoctor();
+    return;
+  }
+
+  if (cmd === 'search') {
+    const q = flags._[0] || flags.q;
+    if (!q) throw new Error('用法: cfm search <关键词>');
+    const r = searchLibrary(q, {
+      limit: Number(flags.limit || 100),
+      includeJson: !!flags.all,
+      includeArchive: !!flags.all
+    });
+    if (wantJson) return jsonOut(r);
+    for (const m of r.matches) out(`${m.path}:${m.line}: ${m.text}`);
+    out(`\n${r.total} 个匹配${r.truncated ? '（只显示前 ' + r.matches.length + ' 个）' : ''}`);
+    return;
+  }
+
+  if (cmd === 'backup') {
+    const r = createBackup({ out: typeof flags.out === 'string' ? flags.out : undefined });
+    if (wantJson) return jsonOut(r);
+    head('备份完成');
+    out('  文件  ' + r.path);
+    out('  体积  ' + r.size);
+    out('  条目  ' + r.entries.join(', '));
+    return;
+  }
+
+  if (cmd === 'restore') {
+    const archive = flags._[0];
+    if (!archive) throw new Error('用法: cfm restore <archive> --yes');
+    const r = restoreBackup(archive, { yes: !!flags.yes });
+    if (wantJson) return jsonOut(r);
+    head('恢复完成');
+    out('  恢复  ' + r.restored.join(', '));
+    out('  当前状态备份  ' + r.backupDir);
+    return;
+  }
+
+  if (cmd === 'repair') {
+    const r = runRepair();
+    if (wantJson) return jsonOut(r);
+    out('修复完成: ' + r.app);
+    return;
+  }
+
+  if (cmd === 'uninstall') {
+    const r = runUninstall({ yes: !!flags.yes, keepConfig: !!flags['keep-config'] });
+    if (wantJson) return jsonOut(r);
+    if (r.moved) out('已移走: ' + r.moved);
+    if (r.restored) out('已恢复配置: ' + r.restored);
+    out('知识库与 provider 数据未删除。');
+    return;
+  }
 
   if (cmd === 'storage') {
     const sub = flags._[0];
@@ -332,10 +504,34 @@ export async function main(argv) {
       out(`目录: ${r.catalog.path}（${r.catalog.count} 个模型）`);
       return;
     }
+    if (sub === 'current' || sub === 'status') {
+      const c = configSummary();
+      if (wantJson) return jsonOut({ ...c, config: CONFIG_PATH });
+      out(`model=${c.model || '?'} provider=${c.provider || '?'}`);
+      out(`config=${CONFIG_PATH}`);
+      return;
+    }
     if (sub === 'test') {
       const id = flags._[1];
-      if (!id) throw new Error('用法: cfm providers test <id>');
+      if (!id) {
+        const list = listProviders();
+        if (!list.length) { out('还没有注册供应商。'); return; }
+        const results = [];
+        for (const p of list) {
+          try {
+            const r = await testProvider(p.id);
+            results.push({ id: p.id, ...r });
+            out(`${p.id}: HTTP ${r.models?.status ?? r.status} · models=${r.modelCount ?? '?'} · responses=${r.responses?.status ?? '?'}`);
+          } catch (e) {
+            results.push({ id: p.id, error: e.message });
+            out(`${p.id}: ! ${e.message}`);
+          }
+        }
+        if (wantJson) return jsonOut(results);
+        return;
+      }
       const r = await testProvider(id);
+      if (wantJson) return jsonOut(r);
       out(`HTTP ${r.models?.status ?? r.status} · models=${r.modelCount ?? '?'} · responses=${r.responses?.status ?? '?'} · ${r.baseUrl}`);
       if (!r.responses?.ok) out('  ! /responses 未通过：Codex 0.163+ 需要 Responses API，不能直接用 chat/completions');
       return;
@@ -372,6 +568,19 @@ export async function main(argv) {
     if (wantJson) return jsonOut(r);
     out(r.ok ? '更新完成，请重启面板' : '更新失败');
     if (r.stderr) out(r.stderr);
+    return;
+  }
+
+  if (cmd === 'completion') {
+    const shell = flags._[0] || 'zsh';
+    const commands = ['doctor','search','backup','restore','repair','uninstall','storage','library','folders','skills','providers','catalog','codex','ui','panel','knowledge','restore-official','check','update','completion'];
+    if (shell === 'bash') {
+      out(`complete -W "${commands.join(' ')}" cfm`);
+    } else {
+      out(`#compdef cfm`);
+      out(`_cfm() { local -a cmds; cmds=(${commands.map((c) => "'" + c + "'").join(' ')}); _describe 'command' cmds; }`);
+      out(`compdef _cfm cfm`);
+    }
     return;
   }
 
