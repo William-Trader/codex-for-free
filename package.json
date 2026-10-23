@@ -1,0 +1,39 @@
+{
+  "name": "codex-for-mac",
+  "version": "0.1.0",
+  "description": "Codex for Mac — 自主模型扩展：本地对话/文件夹增强、多家模型接入，保留官方 Codex 框架与 skills。",
+  "type": "module",
+  "bin": {
+    "cfm": "bin/cfm.mjs"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "test": "node --test",
+    "start": "node bin/cfm.mjs"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/William-Trader/codex-for-mac.git"
+  },
+  "homepage": "https://github.com/William-Trader/codex-for-mac",
+  "keywords": [
+    "codex",
+    "macos",
+    "deepseek",
+    "qwen",
+    "llm",
+    "local-first",
+    "noesis"
+  ],
+  "files": [
+    "bin",
+    "src",
+    "public",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ]
+}

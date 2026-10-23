@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Codex for Mac</title>
+<style>
+:root{--bg:#0b0d10;--panel:#12151b;--panel2:#171b23;--line:#242a35;--text:#e7eaf0;--muted:#8b93a3;--accent:#7c9cff;--green:#3ddc97;--amber:#f5b84b;--red:#ff6b6b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",sans-serif}
+header{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(11,13,16,.92);backdrop-filter:blur(10px);z-index:5}
+.logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#7c9cff,#3ddc97);display:grid;place-items:center;font-weight:700;color:#08101c}
+h1{font-size:15px;margin:0;font-weight:650;letter-spacing:.2px}
+.sub{color:var(--muted);font-size:12px}
+header .grow{flex:1}
+button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:13px;cursor:pointer}
+button:hover{border-color:#3a4557;background:#1b2130}
+button.primary{background:var(--accent);color:#08101c;border-color:transparent;font-weight:650}
+button.ghost{background:transparent}
+button.danger:hover{border-color:var(--red);color:var(--red)}
+main{padding:18px 20px 40px;max-width:1500px;margin:0 auto}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.card .k{color:var(--muted);font-size:12px}
+.card .v{font-size:22px;font-weight:650;margin-top:4px;letter-spacing:.2px}
+.tabs{display:flex;gap:6px;margin:4px 0 14px}
+.tab{padding:7px 12px;border-radius:8px;color:var(--muted);cursor:pointer;font-size:13px}
+.tab.active{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+.split{display:grid;grid-template-columns:320px 1fr;gap:14px;min-height:520px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.panel .hd{padding:11px 14px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.panel .bd{padding:8px;max-height:640px;overflow:auto}
+.item{padding:9px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent}
+.item:hover{background:var(--panel2)}
+.item.active{background:var(--panel2);border-color:#31405c}
+.item .t{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .m{color:var(--muted);font-size:11px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.count{margin-left:auto;color:var(--muted);font-size:11px}
+.preview{padding:18px 22px;max-height:640px;overflow:auto}
+.preview pre{white-space:pre-wrap;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:#cdd4e3}
+.preview h2{font-size:15px;margin:0 0 8px}
+.meta{color:var(--muted);font-size:12px;margin-bottom:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.providers{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.provider{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.provider h3{margin:0 0 4px;font-size:14px}
+.tag{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;background:#1d2432;color:var(--muted);border:1px solid var(--line)}
+.tag.ok{color:var(--green);border-color:#1f4a3a}
+.tag.warn{color:var(--amber);border-color:#4a3c1f}
+.kv{color:var(--muted);font-size:12px;margin:4px 0}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:4px 9px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--muted)}
+.list{padding:4px 0}
+.empty{color:var(--muted);padding:22px;text-align:center;font-size:13px}
+.toast{position:fixed;right:18px;bottom:18px;background:#1b2230;border:1px solid #31405c;border-radius:10px;padding:10px 14px;font-size:13px;opacity:0;transform:translateY(8px);transition:.2s;max-width:420px}
+.toast.show{opacity:1;transform:none}
+.hidden{display:none!important}
+@media(max-width:980px){.cards{grid-template-columns:repeat(2,1fr)}.split{grid-template-columns:1fr}.providers{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">C</div>
+  <div><h1>Codex for Mac</h1><div class="sub" id="ver">自主模型扩展 · 本地对话库</div></div>
+  <div class="grow"></div>
+  <button onclick="exportLib()" class="primary">导出全部对话</button>
+  <button onclick="openDir('') ">在 Finder 打开</button>
+</header>
+<main>
+  <div class="cards">
+    <div class="card"><div class="k">本地对话</div><div class="v" id="s-conv">-</div></div>
+    <div class="card"><div class="k">项目</div><div class="v" id="s-proj">-</div></div>
+    <div class="card"><div class="k">Codex 占用</div><div class="v" id="s-size">-</div></div>
+    <div class="card"><div class="k">官方 Skills</div><div class="v" id="s-skills">-</div></div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="chat" onclick="tab('chat')">对话</div>
+    <div class="tab" data-tab="providers" onclick="tab('providers')">模型供应商</div>
+    <div class="tab" data-tab="storage" onclick="tab('storage')">存储</div>
+    <div class="tab" data-tab="ext" onclick="tab('ext')">扩展 / Skills</div>
+  </div>
+
+  <section id="tab-chat">
+    <div class="split">
+      <div class="panel">
+        <div class="hd">项目 <span class="count" id="lib-path"></span></div>
+        <div class="bd" id="projects"></div>
+      </div>
+      <div class="panel">
+        <div class="hd"><span id="list-title">对话</span><span class="grow" style="flex:1"></span><span class="count" id="conv-count"></span></div>
+        <div class="bd" id="convs"></div>
+        <div class="preview hidden" id="preview"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-providers" class="hidden">
+    <div class="providers" id="provider-list"></div>
+    <div class="card" style="margin-top:12px">
+      <div class="k">接入新厂商</div>
+      <div class="kv">终端运行：<code>cfm providers add qwen</code>（或 deepseek / kimi / zhipu / minimax / openai-compatible），再 <code>cfm providers use qwen</code>。</div>
+      <div class="kv">Key 只保存在 <code>~/.codex-for-mac/secrets/</code>，权限 600，不会出现在本页面或仓库。</div>
+    </div>
+  </section>
+
+  <section id="tab-storage" class="hidden">
+    <div class="cards" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card"><div class="k">Codex 数据</div><div class="v" id="st-total">-</div></div>
+      <div class="card"><div class="k">会话文件</div><div class="v" id="st-sessions">-</div></div>
+      <div class="card"><div class="k">SQLite</div><div class="v" id="st-db">-</div></div>
+    </div>
+    <div class="panel"><div class="hd">维护</div><div class="bd" style="padding:14px">
+      <div class="row">
+        <button onclick="vacuum(false)">预演压缩</button>
+        <button class="danger" onclick="vacuum(true)">执行 VACUUM</button>
+        <button onclick="archive(false)">预演归档 90 天</button>
+        <button class="danger" onclick="archive(true)">执行归档（只移不删）</button>
+      </div>
+      <pre id="storage-log" style="white-space:pre-wrap;color:#9aa4b8;font-size:12px;margin-top:14px"></pre>
+    </div></div>
+  </section>
+
+  <section id="tab-ext" class="hidden">
+    <div class="panel"><div class="hd">官方 Skills（只读展示，不会被修改）</div><div class="bd" style="padding:14px"><div class="chips" id="skill-list"></div></div></div>
+    <div class="panel" style="margin-top:12px"><div class="hd">Plugins / Marketplaces</div><div class="bd" style="padding:14px"><div class="chips" id="plugin-list"></div></div></div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+let LIB = { projects: [], conversations: [] };
+let activeProject = '';
+let activeConv = null;
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg) { const el = $('toast'); el.textContent = msg; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2600); }
+async function api(url, opts) { const r = await fetch(url, opts); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }
+function tab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  for (const x of ['chat','providers','storage','ext']) $('tab-' + x).classList.toggle('hidden', x !== name);
+  if (name === 'providers') loadProviders();
+  if (name === 'storage') loadStorage();
+  if (name === 'ext') loadExt();
+}
+async function load() {
+  try {
+    const s = await api('/api/summary');
+    $('ver').textContent = 'v' + s.app.version + ' · ' + (s.codex.found ? 'Codex ' + (s.codex.version || '') : '未检测到 Codex');
+    $('s-conv').textContent = s.library.conversations ?? 0;
+    $('s-proj').textContent = s.library.projects ?? 0;
+    $('s-size').textContent = s.storage.total;
+    $('s-skills').textContent = s.skills.count;
+    $('lib-path').textContent = s.library.root || '';
+  } catch (e) { toast('加载失败: ' + e.message); }
+  try { LIB = await api('/api/library'); renderProjects(); renderConvs(); }
+  catch (e) { toast('本地库读取失败: ' + e.message); }
+}
+function renderProjects() {
+  const box = $('projects');
+  const projs = LIB.projects || [];
+  let html = '<div class="item ' + (activeProject === '' ? 'active' : '') + '" onclick="pickProject(\'\')"><div class="t">全部对话</div><div class="m">' + (LIB.conversations || []).length + ' 个对话</div></div>';
+  for (const p of projs) {
+    const n = (LIB.conversations || []).filter(c => c.projectSlug === p.slug).length;
+    html += '<div class="item ' + (activeProject === p.slug ? 'active' : '') + '" onclick="pickProject(\'' + esc(p.slug) + '\')" title="' + esc(p.path || '') + '"><div class="t">' + esc(p.name) + (p.missing ? ' ⚠' : '') + '</div><div class="m">' + esc(p.path || '未归属') + '</div><div class="count">' + n + '</div></div>';
+  }
+  box.innerHTML = html || '<div class="empty">还没有导出对话</div>';
+}
+function pickProject(slug) { activeProject = slug; activeConv = null; renderProjects(); renderConvs(); $('preview').classList.add('hidden'); }
+function renderConvs() {
+  const box = $('convs');
+  const list = (LIB.conversations || []).filter(c => !activeProject || c.projectSlug === activeProject);
+  $('conv-count').textContent = list.length + ' 个';
+  $('list-title').textContent = activeProject ? (LIB.projects.find(p => p.slug === activeProject)?.name || '对话') : '全部对话';
+  if (!list.length) { box.innerHTML = '<div class="empty">暂无对话。点右上角「导出全部对话」生成。</div>'; return; }
+  box.innerHTML = list.slice(0, 300).map(c =>
+    '<div class="item ' + (activeConv === c.files.markdown ? 'active' : '') + '" onclick="openConv(\'' + esc(c.files.markdown) + '\')">' +
+    '<div class="t">' + esc(c.title) + '</div><div class="m">' + esc((c.createdAt || '').slice(0,10)) + ' · ' + esc(c.model || '') + ' · ' + esc(c.projectName || '') + '</div></div>'
+  ).join('');
+}
+async function openConv(rel) {
+  activeConv = rel;
+  try {
+    const c = await api('/api/conversation?rel=' + encodeURIComponent(rel));
+    const prev = $('preview');
+    prev.classList.remove('hidden');
+    const md = c.text;
+    prev.innerHTML = '<div class="row" style="margin-bottom:12px"><button onclick="reveal(\'' + esc(rel) + '\')">在 Finder 显示</button><button onclick="openFile(\'' + esc(rel) + '\')" class="ghost">用默认应用打开</button></div><pre>' + esc(md) + '</pre>';
+    prev.scrollTop = 0;
+    renderConvs();
+  } catch (e) { toast('读取失败: ' + e.message); }
+}
+async function reveal(rel) { try { await api('/api/reveal', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({rel})}); toast('已在 Finder 中显示'); } catch (e) { toast(e.message); } }
+async function openFile(rel) { try { await api('/api/reveal', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({rel, openFile:true})}); } catch (e) { toast(e.message); } }
+async function openDir(rel) { try { await api('/api/reveal', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({rel, openDir:true})}); } catch (e) { toast(e.message); } }
+async function exportLib() {
+  toast('正在导出…');
+  try { const r = await api('/api/library/export', {method:'POST', headers:{'content-type':'application/json'}, body:'{}'}); toast('已导出 ' + r.conversations + ' 个对话 / ' + r.projects + ' 个项目'); await load(); }
+  catch (e) { toast('导出失败: ' + e.message); }
+}
+async function loadProviders() {
+  try {
+    const j = await api('/api/providers');
+    $('provider-list').innerHTML = j.providers.length ? j.providers.map(p =>
+      '<div class="provider"><h3>' + esc(p.name) + ' <span class="tag ' + (p.hasKey ? 'ok' : 'warn') + '">' + (p.hasKey ? 'key 已保存' : '无 key') + '</span></h3>' +
+      '<div class="kv">' + esc(p.id) + ' · ' + esc(p.baseUrl) + '</div>' +
+      '<div class="kv">模型：' + p.models.map(m => '<span class="chip">' + esc(m) + '</span>').join(' ') + '</div>' +
+      '<div class="row" style="margin-top:8px"><button onclick="testProvider(\'' + esc(p.id) + '\')">测试连接</button>' +
+      '<button onclick="useProvider(\'' + esc(p.id) + '\')" class="primary">设为默认</button></div></div>'
+    ).join('') : '<div class="empty">还没有注册供应商。终端运行 cfm providers add deepseek</div>';
+  } catch (e) { toast(e.message); }
+}
+async function testProvider(id) { try { const r = await api('/api/providers/test', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({id})}); toast('HTTP ' + r.status + ' · ' + (r.modelCount ?? '?') + ' 个模型'); } catch (e) { toast('测试失败: ' + e.message); } }
+async function useProvider(id) { try { const r = await api('/api/providers/use', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({id})}); toast('已切换默认模型: ' + r.model); } catch (e) { toast('切换失败: ' + e.message); } }
+async function loadStorage() {
+  try {
+    const s = await api('/api/summary');
+    $('st-total').textContent = s.storage.total;
+    $('st-sessions').textContent = s.storage.sessions.files + ' 个 / ' + s.storage.sessions.size;
+    $('st-db').textContent = Object.keys(s.storage.databases).length + ' 个';
+  } catch (e) { toast(e.message); }
+}
+async function vacuum(apply) {
+  if (apply && !confirm('执行 VACUUM 会短暂锁定数据库，建议先退出 Codex 会话。继续？')) return;
+  try {
+    const r = await api('/api/storage/vacuum', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({apply})});
+    $('storage-log').textContent = JSON.stringify(r, null, 2);
+    toast(apply ? '压缩完成，节省 ' + r.totalSavedSize : '预演完成');
+  } catch (e) { toast(e.message); }
+}
+async function archive(apply) {
+  if (apply && !confirm('归档会把 90 天前的会话文件移动到 ~/.codex-for-mac/archive（只移不删）。继续？')) return;
+  try {
+    const r = await api('/api/storage/archive', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({days:90, apply})});
+    $('storage-log').textContent = JSON.stringify(r, null, 2);
+    toast(apply ? '已归档 ' + r.count + ' 个文件' : '预演完成');
+  } catch (e) { toast(e.message); }
+}
+async function loadExt() {
+  try {
+    const s = await api('/api/skills');
+    $('skill-list').innerHTML = s.skills.length ? s.skills.map(k => '<span class="chip" title="' + esc(k.description) + '">' + esc(k.name) + '</span>').join('') : '<span class="empty">没有发现 skills</span>';
+    $('plugin-list').innerHTML = (s.plugins.map(p => '<span class="chip">' + esc(p.name) + '</span>').join('') || '<span class="empty">没有 plugins</span>') +
+      (s.marketplaces.length ? ' <span class="chip">marketplace: ' + esc(s.marketplaces.join(', ')) + '</span>' : '');
+  } catch (e) { toast(e.message); }
+}
+load();
+</script>
+</body>
+</html>
