@@ -7,6 +7,7 @@ import { storageReport, vacuumAll, archiveOldSessions, folderReport } from './st
 import { readLibrary, readConversation, exportLibrary, libraryRoot, libraryStats, revealPath } from './library.mjs';
 import { listSkills } from './skills.mjs';
 import { PRESETS, parseModels, listProviders, useProvider, testProvider, loadRegistry, testConnection, onboardProvider } from './providers.mjs';
+import { checkForUpdates, updateNow } from './update.mjs';
 import { locateCodex, CFM_HOME, HOME, CONFIG_PATH } from './paths.mjs';
 import { PROFILE } from './profile.mjs';
 import { run, redact, platform } from './util.mjs';
@@ -129,6 +130,7 @@ export function createServer() {
         return;
       }
       if (req.method === 'GET' && u.pathname === '/api/summary') return json(res, 200, summary());
+      if (req.method === 'GET' && u.pathname === '/api/update') return json(res, 200, await checkForUpdates());
       if (req.method === 'GET' && u.pathname === '/api/onboarding') {
         return json(res, 200, {
           configured: Boolean(modelProvider() || listProviders().length),
@@ -148,6 +150,7 @@ export function createServer() {
       if (req.method === 'GET' && u.pathname === '/api/providers') return json(res, 200, { providers: listProviders(), registry: Object.keys(loadRegistry().providers) });
       if (req.method === 'POST' && !originOk(req)) return json(res, 403, { error: 'origin not allowed' });
       if (req.method === 'POST' && rateLimited(req)) return json(res, 429, { error: 'too many requests' });
+      if (req.method === 'POST' && u.pathname === '/api/update/run') return json(res, 200, updateNow());
       if (req.method === 'POST' && u.pathname === '/api/onboarding/test') {
         const b = await body(req);
         const preset = PRESETS[b.presetId];

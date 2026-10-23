@@ -16,6 +16,7 @@ import {
   loadRegistry, hasSecret, secretPath, parseModels, readSecret
 } from './providers.mjs';
 import { buildCatalog } from './catalog.mjs';
+import { checkForUpdates, updateNow } from './update.mjs';
 import { startServer } from './server.mjs';
 
 const pkg = JSON.parse(fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'));
@@ -185,6 +186,8 @@ export async function main(argv) {
   cfm catalog build <id>             重新生成模型目录
   cfm codex [...args]                用当前配置启动官方 Codex CLI
   cfm ui [--port 4317]               启动本地面板
+  cfm check                           检查更新
+  cfm update                          安装最新版（npm -g codex-for-free@latest）
 
 安全: API key 只写入 ~/.codex-for-mac/secrets/*.key（600），不会出现在仓库或日志。
 `);
@@ -334,6 +337,24 @@ export async function main(argv) {
       return;
     }
     throw new Error('catalog 子命令: build <id>');
+  }
+
+  if (cmd === 'check') {
+    const r = await checkForUpdates();
+    if (wantJson) return jsonOut(r);
+    if (r.error) out('! ' + r.error);
+    else if (r.outdated) out('发现新版本 v' + r.latest + '（当前 v' + r.current + '）\n  ' + r.url);
+    else out('当前已是最新版本 v' + r.current);
+    return;
+  }
+
+  if (cmd === 'update') {
+    out('正在安装 codex-for-free@latest …');
+    const r = updateNow();
+    if (wantJson) return jsonOut(r);
+    out(r.ok ? '更新完成，请重启面板' : '更新失败');
+    if (r.stderr) out(r.stderr);
+    return;
   }
 
   if (cmd === 'codex') {

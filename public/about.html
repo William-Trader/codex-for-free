@@ -19,6 +19,14 @@ h1{font-size:24px;margin:0 0 6px;font-weight:650}
 .links a{color:#10a37f;text-decoration:none;font-size:12px;border:1px solid #3a3a3a;border-radius:999px;padding:5px 12px}
 .links a:hover{border-color:#6b6b6b}
 .copy{color:#8a8a8a;font-size:11px;border-top:1px solid var(--line);padding-top:14px}
+.update{margin:4px 0 14px;display:flex;flex-direction:column;gap:8px;align-items:center}
+.upd-btn{background:#10a37f;color:#fff;border:0;border-radius:999px;padding:8px 16px;font-size:13px;cursor:pointer}
+.upd-btn:hover{background:#0e8f70}
+.upd-btn:disabled{opacity:.6;cursor:default}
+.upd-msg{font-size:12px;color:var(--muted);min-height:16px}
+.upd-msg.ok{color:#10a37f}
+.upd-msg.has a{color:#10a37f;text-decoration:none}
+.footnote{color:#6f6f6f;font-size:10.5px;margin-top:10px}
 .back{position:fixed;left:20px;top:18px;color:#10a37f;text-decoration:none;font-size:12px}
 </style>
 </head>
@@ -35,7 +43,12 @@ h1{font-size:24px;margin:0 0 6px;font-weight:650}
     <a id="repo" href="https://github.com/William-Trader/codex-for-free" target="_blank" rel="noreferrer">GitHub</a>
     <a href="/">打开面板</a>
   </div>
+  <div class="update">
+    <button class="upd-btn" id="checkBtn" onclick="checkUpdate()">检查更新</button>
+    <div class="upd-msg" id="updateMsg"></div>
+  </div>
   <div class="copy" id="copy">© 2026 William</div>
+  <div class="footnote">中国大陆用户完整服务必须要使用魔法</div>
 </main>
 <script>
 fetch('/api/about').then(r => r.json()).then(a => {
@@ -46,6 +59,20 @@ fetch('/api/about').then(r => r.json()).then(a => {
   document.getElementById('copy').textContent = a.copyright;
   document.getElementById('repo').href = a.repo;
 }).catch(() => {});
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function checkUpdate() {
+  const btn = document.getElementById('checkBtn');
+  const msg = document.getElementById('updateMsg');
+  btn.disabled = true; btn.textContent = '检查中…';
+  msg.className = 'upd-msg'; msg.textContent = '';
+  try {
+    const r = await fetch('/api/update').then(x => x.json());
+    if (r.error) { msg.textContent = r.error; }
+    else if (r.outdated) { msg.className = 'upd-msg has'; msg.innerHTML = '发现新版本 v' + esc(r.latest) + ' · <a href="' + esc(r.url) + '" target="_blank" rel="noreferrer">去更新</a>'; }
+    else { msg.className = 'upd-msg ok'; msg.textContent = '当前已是最新版本 v' + esc(r.current); }
+  } catch (e) { msg.textContent = '检查失败：' + e.message; }
+  finally { btn.disabled = false; btn.textContent = '检查更新'; }
+}
 </script>
 </body>
 </html>

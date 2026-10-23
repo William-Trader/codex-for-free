@@ -1,7 +1,7 @@
 {
   "name": "codex-for-free",
-  "version": "1.0.2",
-  "description": "Codex for Free v1.0.2 — 给不想用终端的人：图形化 Codex 前端、本地对话/项目库、多家模型接入。Powered by William.",
+  "version": "1.0.3",
+  "description": "Codex for Free v1.0.3 — 给不想用终端的人：图形化 Codex 前端、本地对话/项目库、多家模型接入。Powered by William.",
   "type": "module",
   "bin": {
     "cfm": "bin/cfm.mjs",

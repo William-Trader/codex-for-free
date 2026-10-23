@@ -16,13 +16,13 @@
 ## 30 秒开始（小白版）
 
 1. 安装 **Node.js 24**：<https://nodejs.org>
-2. 下载 Release 里的 `codex-for-free-1.0.2.tgz`，或克隆本仓库
+2. 下载 Release 里的 `codex-for-free-1.0.3.tgz`，或克隆本仓库
 3. 任选一种启动方式：
 
 ```bash
 # A. 双击 start.command（macOS，最省事）
 # B. 终端安装
-npm i -g codex-for-free-1.0.2.tgz
+npm i -g codex-for-free-1.0.3.tgz
 cfm ui
 ```
 

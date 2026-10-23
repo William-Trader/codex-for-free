@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3 — 2026-10-23
+
+- About 页新增「检查更新」与自动更新功能（cfm check / cfm update）。
+- About 页新增小字：中国大陆用户完整服务必须使用魔法。
+- 服务端新增 /api/update 与 /api/update/run。
+
 ## 1.0.2 — 2026-10-23
 
 - 品牌统一为 Codex for Free；包名、仓库地址、UI、About 页全部更新。
