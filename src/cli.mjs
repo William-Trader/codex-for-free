@@ -180,7 +180,7 @@ export async function main(argv) {
   const flags = parseArgs(rest);
   const wantJson = !!flags.json;
 
-  if (!cmd || cmd === 'help' || flags.help) {
+  if (!cmd || cmd === 'help' || cmd === '--help' || cmd === '-h' || flags.help) {
     out(`codex-for-mac v${pkg.version} — 自主模型扩展 + 本地对话库
 
 用法:

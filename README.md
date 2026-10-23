@@ -1,108 +1,140 @@
-# Codex for Free · macOS
+# Codex for Free
 
-**把已经安装的官方 GPT 前端，在本机变成 Codex for Free。**
+**一个本地化的 GPT 前端入口，外加可选的本地知识库和 provider 面板。**
 
-当前 Release 提供的是一个本地安装器：复制官方 `ChatGPT.app`，改名为 `Codex for Free.app`，写入 DeepSeek provider 配置，跳过登录页，直接进入 GPT 对话前端。
+当前项目由两层组成：
 
-## 下载与安装
+1. **GPT 前端安装器**：把本机已经安装的官方 `ChatGPT.app` 复制并改名为 `Codex for Free.app`，写入 DeepSeek provider，跳过登录页。
+2. **本地工具层**：保留 `cfm` 命令、管理面板和对话知识库，用命令打开，不干扰 GPT 前端。
 
-Release 资产：
+> 官方 OpenAI 应用不进入本仓库，也不随 Release 再分发。安装器只在本机操作你已经安装的应用。
 
-```text
-Codex-for-Free-1.1.0-Installer.zip
-```
+## 快速开始
 
-使用步骤：
+### 使用 GPT 前端
 
-1. 先安装官方 **ChatGPT.app**（默认路径 `/Applications/ChatGPT.app`）
-2. 解压安装器
-3. 双击 `Install Codex for Free.command`
-4. 输入 DeepSeek API key
-5. 安装完成后自动打开 `Codex for Free.app`
+1. 安装官方 ChatGPT macOS 应用
+2. 下载 Release 里的 `Codex-for-Free-1.1.0-Installer.zip`
+3. 解压后双击 `Install Codex for Free.command`
+4. 输入自己的 DeepSeek API key
 
-终端方式：
+安装器会：
+
+- 复制官方 app 到临时目录再修改，避免 macOS App Management 阻止写入
+- 改显示名为 `Codex for Free`
+- 写入 DeepSeek provider 和模型目录
+- 备份原有 `~/.codex/config.toml`
+- 重新签名外层 app bundle
+
+### 打开本地面板和知识库
+
+`Codex for Free.app` 本身是 GPT 前端；本地面板和知识库是独立命令：
 
 ```bash
-./install.sh
-# 官方 app 不在默认路径时
-CHATGPT_APP="/path/to/ChatGPT.app" ./install.sh
+cfm panel       # 打开管理面板
+cfm knowledge   # 在 Finder 打开知识库
+cfm library list
+cfm providers list
 ```
 
-## 为什么不直接上传 1.7GB 应用
+也可以双击桌面上的：
 
-当前正在使用的 `Codex for Free.app` 是 **OpenAI 闭源 ChatGPT 应用**的本地改名版本。把整个 app 放进 GitHub Release 属于再分发闭源应用，不能这样做。
+```text
+打开 Codex for Free 面板.command
+打开 Codex for Free 知识库.command
+```
 
-所以 Release 只包含：
+## 仓库结构
 
-- 本地安装/改名脚本
-- 图标
-- DeepSeek 模型目录
-- 配置合并逻辑
+```text
+.
+├── installer/                 # GPT 前端本地安装器（Release 资产）
+│   ├── install.sh
+│   ├── Install Codex for Free.command
+│   ├── AppIcon.icns
+│   └── catalog/deepseek.json
+├── bin/                       # cfm CLI 入口
+├── src/                       # 本地面板、provider、库管理逻辑
+├── public/                    # 面板前端
+├── macapp/                    # 早期独立 app 包装（历史保留）
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── KNOWLEDGE_BASE.md
+│   └── OPERATIONS.md
+├── scripts/build-app.sh
+└── .github/workflows/ci.yml
+```
 
-官方 app 由使用者自己安装，安装器只在本地操作。
+## 知识库
 
-## 安装器做了什么
+精简后的默认结构：
 
-- 把官方 app 复制到临时目录再修改，避免 macOS App Management 阻止写入
-- 修改显示名为 `Codex for Free`
-- 替换本地图标
-- 重新签名外层 app bundle
-- 写入 `~/.codex/config.toml` 的 DeepSeek provider 配置
-- 保留官方插件、skills、marketplaces 和已有数据
-- 修改配置前自动备份
-- API key 只写入 0600 权限配置，不进入仓库、日志或回复
+```text
+~/Documents/Codex Library/
+├── INDEX.md                    # 人类可读索引
+├── index.json                  # 程序索引
+├── projects/
+│   └── codex-for-mac-1172ca/
+│       ├── project.json
+│       └── conversations/*.md, *.json
+├── inbox/
+└── _archive/
+    ├── manifest.csv
+    └── test-projects-20261023/
+```
 
-## 登录绕过
+- 每条对话保留 `.md`（阅读）和 `.json`（程序读取）。
+- 测试对话已移动到 `_archive/test-projects-20261023/`，没有删除。
+- 恢复映射在 `_archive/manifest.csv`。
+- 详细说明见 [docs/KNOWLEDGE_BASE.md](docs/KNOWLEDGE_BASE.md)。
 
-安装器配置：
+常用查找：
+
+```bash
+rg -n "关键词" ~/Documents/Codex\ Library
+find ~/Documents/Codex\ Library/projects -name '*.md'
+cfm library list
+```
+
+## Provider
+
+当前默认 provider 为 DeepSeek，配置在 `~/.codex/config.toml`：
 
 ```toml
 model = "deepseek-v4-pro"
 model_provider = "deepseek"
 model_catalog_json = "~/.codex-for-mac/catalog/deepseek.json"
-model_reasoning_effort = "medium"
-
-[model_providers.deepseek]
-name = "DeepSeek"
-base_url = "https://api.deepseek.com/v1"
-wire_api = "responses"
 ```
 
-官方前端会使用自定义 provider，不再要求 ChatGPT 登录。`codex login status` 仍可能显示“未登录”，这是预期行为。
+管理命令：
 
-## 恢复官方状态
+```bash
+cfm providers list
+cfm providers test deepseek
+cfm providers use deepseek --model deepseek-v4-pro --effort medium
+cfm panel
+```
 
-- 官方 `ChatGPT.app` 不会被安装器删除。
-- 配置备份：`~/.codex/config.toml.bak-login-*`
-- 恢复：把备份复制回 `~/.codex/config.toml`
-- 移除前端：把 `/Applications/Codex for Free.app` 移到废纸篓
+API key 只保存在本机 0600 文件或 `~/.codex/config.toml` 的请求头里，不进入仓库、日志或回复。
 
-## 限制
+## 边界
 
-- 官方 app 自动升级可能覆盖本地改名，升级后需要重新运行安装器。
+- **登录绕过**依赖自定义 provider；ChatGPT 账号云功能、Cloud 任务、远程控制等不可用是预期结果。
+- **官方 app 更新**可能覆盖本地改名和配置；更新后需要重新运行安装器。
+- **GPT 前端不内嵌**本地面板/知识库；这是刻意隔离，避免修改官方 UI。
+- **不承诺模型能力对等**：DeepSeek 不支持 OpenAI 的图像生成、部分语音/账号能力。
 - 仅支持 macOS。
-- 登录绕过依赖自定义 provider，不适用于必须使用 ChatGPT 账号云功能的场景。
 
-## 工程结构
+## 开发
 
-```text
-installer/
-├── install.sh
-├── Install Codex for Free.command
-├── README.md
-├── AppIcon.icns
-└── catalog/deepseek.json
+```bash
+node --test
+node --check src/*.mjs
+zsh -n installer/install.sh
 ```
 
-早期自研面板源码仍保留在 `src/`、`public/`，当前 Release 采用 GPT 前端安装器方案。
-
-## 安全
-
-- 仓库不包含 API key、cookie 或用户数据。
-- key 只写入 `~/.codex/config.toml`（0600）。
-- 安装器不联网上传任何数据。
-- 官方 app 的本地修改只用于本机，不对外分发。
+CI：`.github/workflows/ci.yml`。
 
 ## License
 
-MIT（本项目安装器与脚本代码）。OpenAI ChatGPT.app 不包含在本仓库中，遵循其自身许可。
+MIT。安装器脚本和本项目代码开源；OpenAI ChatGPT.app 遵循其自身许可，不包含在本仓库中。
