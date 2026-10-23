@@ -21,16 +21,22 @@
 - `cfm library export` 默认导出隔离会话，`--official` 只读导入官方对话，索引会合并。
 - 官方 Skills / Plugins / Marketplaces 只读展示，不会被修改。
 
+## 直接下载 macOS 应用
+
+- Release 里的 `Codex-for-Free-1.0.5-macOS.zip` 解压后拖进 Applications，双击启动。
+- 独立 bundle id，不会覆盖或接管官方 Codex。
+- 应用只负责启动本地面板；官方 Codex 继续独立运行。
+
 ## 30 秒开始（小白版）
 
 1. 安装 **Node.js 24**：<https://nodejs.org>
-2. 下载 Release 里的 `codex-for-free-1.0.4.tgz`，或克隆本仓库
+2. 下载 Release 里的 `codex-for-free-1.0.5.tgz`，或克隆本仓库
 3. 任选一种启动方式：
 
 ```bash
 # A. 双击 start.command（macOS，最省事）
 # B. 终端安装
-npm i -g codex-for-free-1.0.4.tgz
+npm i -g codex-for-free-1.0.5.tgz
 cfm ui
 ```
 

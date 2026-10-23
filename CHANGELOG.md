@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.5 — 2026-10-23
+
+- 新增独立 macOS 应用包 Codex for Free.app，bundle id 独立，可与官方 Codex 并存。
+- 应用内置启动器：自动定位 Node、启动隔离面板、打开浏览器。
+- 保持隔离配置 ~/.codex-for-free，不改官方 ~/.codex。
+- 新增构建脚本 scripts/build-app.sh。
+
 ## 1.0.4 — 2026-10-23
 
 - 与官方 Codex 并存：Codex for Free 默认使用独立目录 ~/.codex-for-free，不再改写官方 ~/.codex 配置。
