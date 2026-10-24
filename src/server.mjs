@@ -10,7 +10,7 @@ import { PRESETS, parseModels, listProviders, useProvider, testProvider, loadReg
 import { checkForUpdates, updateNow } from './update.mjs';
 import { locateCodex, CODEX_HOME, CFM_HOME, HOME, CONFIG_PATH } from './paths.mjs';
 import { PROFILE } from './profile.mjs';
-import { run, redact, platform } from './util.mjs';
+import { run, redact, platform, openPath as openTarget } from './util.mjs';
 
 const PUBLIC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const pkg = JSON.parse(fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'));
@@ -94,19 +94,19 @@ function summary() {
 function reveal(rel) {
   const rootDir = libraryRoot();
   const p = revealPath({ rootDir, rel });
-  spawn('open', ['-R', p], { detached: true, stdio: 'ignore' }).unref();
+  openTarget(p, { reveal: true });
   return p;
 }
 function openDir(rel) {
   const rootDir = libraryRoot();
   const p = revealPath({ rootDir, rel: rel || '.' });
-  spawn('open', [p], { detached: true, stdio: 'ignore' }).unref();
+  openTarget(p);
   return p;
 }
 function openFile(rel) {
   const rootDir = libraryRoot();
   const p = revealPath({ rootDir, rel });
-  spawn('open', [p], { detached: true, stdio: 'ignore' }).unref();
+  openTarget(p);
   return p;
 }
 
@@ -265,7 +265,9 @@ export function startServer({ port = 4317, open = true, openPath = '/' } = {}) {
   const server = createServer();
   server.listen(port, '127.0.0.1', () => {
     const url = `http://127.0.0.1:${port}`;
-    if (open) spawn('open', [url + openPath], { detached: true, stdio: 'ignore' }).unref();
+    // Windows has no `open`; explorer.exe is synchronous and cannot emit an
+    // unhandled ENOENT that would take the server down with it.
+    if (open) { try { openTarget(url + openPath); } catch {} }
     console.log(`codex-for-mac UI: ${url}`);
     console.log(`本地库: ${libraryRoot()}`);
   });

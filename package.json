@@ -1,7 +1,7 @@
 {
   "name": "codex-for-free",
-  "version": "1.2.0",
-  "description": "Codex for Free v1.0.7 — 独立 macOS 应用，内置 Node 运行时，无需安装 Node；与官方 Codex 并存。",
+  "version": "1.3.1",
+  "description": "Codex for Free v1.3.1 - deepseek provider contract for the official Codex desktop app, plus a local CLI on macOS and Windows. Ships no OpenAI binaries.",
   "type": "module",
   "bin": {
     "cfm": "bin/cfm.mjs",
@@ -22,6 +22,7 @@
   "homepage": "https://github.com/William-Trader/codex-for-free",
   "keywords": [
     "codex",
+    "windows",
     "macos",
     "deepseek",
     "qwen",
@@ -33,6 +34,7 @@
     "bin",
     "src",
     "public",
+    "installer/install.ps1",
     "README.md",
     "LICENSE",
     "NOTICE",

@@ -11,13 +11,13 @@ const LEVELS = {
   max: 'Maximum reasoning depth for the hardest problems'
 };
 
-function reasoningLevels(list, fallback) {
+export function reasoningLevels(list, fallback) {
   const wanted = (list && list.length ? list : (fallback || ['low', 'medium', 'high'])).filter((x) => LEVELS[x]);
   return wanted.map((effort) => ({ effort, description: LEVELS[effort] }));
 }
 
 // Keep tool output usable: 10k tokens wastes a 1M-token window.
-function truncationLimit(context) {
+export function truncationLimit(context) {
   if (context >= 400000) return 60000;
   if (context >= 128000) return 20000;
   return 10000;
