@@ -9,6 +9,25 @@
 
 > 官方 OpenAI 应用不进入本仓库，也不随 Release 再分发。安装器只在本机操作你已经安装的应用。
 
+## Windows（v1.3.0）
+
+Windows 上**不改名、不重签、不复制官方应用**，也**不做登录绕过**：只给官方
+Codex 增加一个可选的 DeepSeek provider，GPT 账号功能照常可用。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File installer\install.ps1
+```
+
+安装器会：备份 `%USERPROFILE%\.codex\config.toml` → 写入 provider →
+从 `/models` 同步真实能力 → 重建模型目录 → 校验 TOML → 安装 `cfm.cmd`。
+
+- CLI：`%LOCALAPPDATA%\Programs\cfm\cfm.cmd`（用户级 PATH，无需管理员）
+- 目录/密钥：`%USERPROFILE%\.codex-for-mac\`（与 macOS 同名，减少分叉）
+- 密钥权限：`icacls` 只授当前用户（等价 0600）
+- 备份：`Compress-Archive` → `.zip`
+
+细节与实测记录见 [docs/WINDOWS.md](docs/WINDOWS.md)。
+
 ## 快速开始
 
 ### 使用 GPT 前端
@@ -183,7 +202,7 @@ reasoning 档位实测（同一道可验证的算术题）：
 - **官方 app 更新**可能覆盖本地改名和配置；更新后需要重新运行安装器。
 - **GPT 前端不内嵌**本地面板/知识库；这是刻意隔离，避免修改官方 UI。
 - **不承诺模型能力对等**：DeepSeek 不支持 OpenAI 的图像生成、部分语音/账号能力。
-- 仅支持 macOS。
+- macOS 与 Windows（v1.3.0 起）；Windows 不包含改名/重签/登录绕过。
 
 ## 开发
 

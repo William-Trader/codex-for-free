@@ -3,7 +3,7 @@ import path from 'node:path';
 import {
   CONFIG_PATH, REGISTRY_PATH, SECRETS_DIR, CATALOG_DIR, CFM_HOME
 } from './paths.mjs';
-import { readJson, writeJson, ensureDir, redact } from './util.mjs';
+import { readJson, writeJson, ensureDir, redact, lockFileAcl } from './util.mjs';
 import { setRootKeys, upsertBlock, tomlTable, withoutRootKeys, withoutTable } from './toml-block.mjs';
 import { buildCatalog } from './catalog.mjs';
 
@@ -14,9 +14,11 @@ export const PRESETS = {
     envKey: 'DEEPSEEK_API_KEY',
     docs: 'https://platform.deepseek.com',
     verified: true,
+    // Values below mirror GET /models (2026-10-24). 'medium' is not a DeepSeek
+    // effort: offering it makes Codex send a value the API rejects.
     models: [
-      { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', context: 1048576, reasoning: ['low', 'medium', 'high', 'max'] },
-      { id: 'deepseek-flash', name: 'DeepSeek V4.1 Flash', context: 1048576, reasoning: ['low', 'medium', 'high', 'max'] }
+      { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', context: 1048576, maxContext: 1048576, maxOutput: 393216, reasoning: ['low', 'high', 'max'], defaultEffort: 'high', inputModalities: ['text'] },
+      { id: 'deepseek-flash', name: 'DeepSeek V4.1 Flash', context: 1048576, maxContext: 1048576, maxOutput: 393216, reasoning: ['low', 'high', 'max'], defaultEffort: 'high', inputModalities: ['text', 'image'] }
     ]
   },
   qwen: {
@@ -97,6 +99,8 @@ export function saveSecret(id, key) {
   ensureDir(SECRETS_DIR, 0o700);
   fs.writeFileSync(secretPath(id), String(key).trim() + '\n', { mode: 0o600 });
   try { fs.chmodSync(secretPath(id), 0o600); } catch {}
+  // Windows equivalent of 0600: drop inheritance, grant only this user.
+  lockFileAcl(secretPath(id));
   return secretPath(id);
 }
 
@@ -209,6 +213,7 @@ export function useProvider(id, { model, effort } = {}) {
   fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true, mode: 0o700 });
   fs.writeFileSync(CONFIG_PATH, cfg, { mode: 0o600 });
   try { fs.chmodSync(CONFIG_PATH, 0o600); } catch {}
+  lockFileAcl(CONFIG_PATH);
   return { provider, model: chosen, effort: effortValue, catalog: cat };
 }
 

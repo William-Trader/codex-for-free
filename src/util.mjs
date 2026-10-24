@@ -43,13 +43,58 @@ export function dirSize(dir) {
 
 export function which(bin) {
   if (!bin) return null;
-  if (bin.includes('/')) return fs.existsSync(bin) ? bin : null;
+  const isWin = process.platform === 'win32';
+  if (bin.includes('/') || (isWin && bin.includes('\\'))) return fs.existsSync(bin) ? bin : null;
+  // Windows resolves executables through PATHEXT; "codex" alone never exists on disk.
+  const exts = isWin
+    ? (process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean)
+    : [''];
+  const names = isWin && !path.extname(bin) ? [bin, ...exts.map((e) => bin + e.toLowerCase()), ...exts.map((e) => bin + e)] : [bin];
   const dirs = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
   for (const d of dirs) {
-    const p = path.join(d, bin);
-    try { fs.accessSync(p, fs.constants.X_OK); return p; } catch {}
+    for (const name of names) {
+      const p = path.join(d, name);
+      try { fs.accessSync(p, fs.constants.X_OK); return p; } catch {}
+    }
   }
   return null;
+}
+
+// Windows has no POSIX mode bits: an equivalent of 0600 is an ACL that grants
+// only the current user. Failure is non-fatal (a non-NTFS volume cannot carry it).
+export function lockFileAcl(target) {
+  if (process.platform !== 'win32' || !target) return false;
+  const user = process.env.USERNAME;
+  if (!user) return false;
+  const r = spawnSync('icacls', [target, '/inheritance:r', '/grant:r', `${user}:F`], { encoding: 'utf8' });
+  return r.status === 0;
+}
+
+export function lockDirAcl(target) {
+  return lockFileAcl(target);
+}
+
+// Reads the effective ACL. Windows has no 0600, so "private" means: no
+// inherited entries and no grant to Everyone / Users / Authenticated Users.
+export function aclIsPrivate(target) {
+  if (process.platform !== 'win32') return null;
+  const r = spawnSync('icacls', [target], { encoding: 'utf8' });
+  if (r.status !== 0) return null;
+  const text = (r.stdout || '') + (r.stderr || '');
+  const shared = /(Everyone|BUILTIN\\Users|NT AUTHORITY\\Authenticated Users|:(I))/i.test(text);
+  return !shared;
+}
+
+export function openPath(target, { reveal = false } = {}) {
+  const plat = process.platform;
+  if (plat === 'win32') {
+    const args = reveal ? ['/select,', target] : [target];
+    return spawnSync('explorer.exe', args, { encoding: 'utf8' });
+  }
+  if (plat === 'darwin') {
+    return spawnSync('open', reveal ? ['-R', target] : [target], { encoding: 'utf8' });
+  }
+  return spawnSync('xdg-open', [target], { encoding: 'utf8' });
 }
 
 export function run(cmd, args = [], opts = {}) {

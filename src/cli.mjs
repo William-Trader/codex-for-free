@@ -3,10 +3,11 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
-  CODEX_HOME, OFFICIAL_CODEX_HOME, OFFICIAL_CONFIG_PATH, CFM_HOME, CONFIG_PATH, CFM_CONFIG_PATH, HOME, locateCodex
+  CODEX_HOME, OFFICIAL_CODEX_HOME, OFFICIAL_CONFIG_PATH, CFM_HOME, CONFIG_PATH, CFM_CONFIG_PATH, HOME, locateCodex,
+  IS_WINDOWS, CFM_BIN_DIR, LOCAL_APP_DATA
 } from './paths.mjs';
 import { officialHasCfm, restoreOfficialConfig } from './isolate.mjs';
-import { fmtBytes, platform, redact } from './util.mjs';
+import { fmtBytes, platform, redact, openPath, lockFileAcl, aclIsPrivate, which } from './util.mjs';
 import { storageReport, vacuumAll, archiveOldSessions, folderReport } from './storage.mjs';
 import {
   exportLibrary, readLibrary, libraryRoot, setLibraryRoot, libraryStats
@@ -20,6 +21,7 @@ import { buildCatalog } from './catalog.mjs';
 import { checkForUpdates, updateNow } from './update.mjs';
 import { startServer } from './server.mjs';
 import { searchLibrary, createBackup, restoreBackup } from './maintenance.mjs';
+import { checkCodexConfig, lintToml } from './toml-check.mjs';
 
 const pkg = JSON.parse(fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'));
 
@@ -93,7 +95,7 @@ function printDoctor() {
   const skills = listSkills();
   const provs = listProviders();
   head('环境');
-  out(`  macOS ${plat.release} / ${plat.arch} / node ${plat.node}`);
+  out(`  ${platformLabel()} ${plat.release} / ${plat.arch} / node ${plat.node}`);
   out(`  Free home    ${CODEX_HOME}`);
   out(`  Official home ${OFFICIAL_CODEX_HOME}`);
   out(`  CFM home     ${CFM_HOME}`);
@@ -120,14 +122,18 @@ function printDoctor() {
 
   const warnings = [];
   try {
-    const st = fs.statSync(CONFIG_PATH);
-    if ((st.mode & 0o777) !== 0o600) warnings.push('config.toml 权限不是 600');
+    fs.statSync(CONFIG_PATH);
+    const acl = aclIsPrivate(CONFIG_PATH);
+    if (acl === null && (fs.statSync(CONFIG_PATH).mode & 0o777) !== 0o600) warnings.push('config.toml 权限不是 600');
+    if (acl === false) warnings.push('config.toml ACL 未收窄（其他用户可读）');
   } catch { warnings.push('config.toml 不存在'); }
   for (const p of provs) {
     if (!p.hasKey) continue;
     try {
-      const st = fs.statSync(secretPath(p.id));
-      if ((st.mode & 0o777) !== 0o600) warnings.push(`secret ${p.id}.key 权限不是 600`);
+      fs.statSync(secretPath(p.id));
+      const acl = aclIsPrivate(secretPath(p.id));
+      if (acl === null && (fs.statSync(secretPath(p.id)).mode & 0o777) !== 0o600) warnings.push(`secret ${p.id}.key 权限不是 600`);
+      if (acl === false) warnings.push(`secret ${p.id}.key ACL 未收窄`);
     } catch {}
   }
   if (!lib.exists) warnings.push('本地对话库尚未导出：运行 cfm library export');
@@ -164,7 +170,25 @@ function printLibrary(idx) {
   }
 }
 
-const APP_PATH = process.env.CFM_APP_PATH || '/Applications/Codex for Free.app';
+// macOS installs a renamed copy; Windows keeps the official app untouched.
+const APP_PATH = process.env.CFM_APP_PATH || (IS_WINDOWS
+  ? path.join(LOCAL_APP_DATA, 'OpenAI', 'Codex')
+  : '/Applications/Codex for Free.app');
+
+function platformLabel() {
+  return IS_WINDOWS ? 'Windows' : 'macOS';
+}
+
+// The Windows app carries no Info.plist; the desktop build writes its own
+// version into the CLI environment block it provisions in config.toml.
+function windowsAppVersion(app) {
+  try {
+    const cfg = fs.readFileSync(CONFIG_PATH, 'utf8');
+    const m = cfg.match(/BROWSER_USE_CODEX_APP_VERSION\s*=\s*"([^"]+)"/);
+    if (m) return m[1];
+  } catch {}
+  return null;
+}
 
 function configSummary() {
   try {
@@ -186,6 +210,7 @@ function keyFromConfig() {
 function installCli(dirFlag) {
   const script = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'cfm.mjs');
   if (!fs.existsSync(script)) throw new Error('找不到 bin/cfm.mjs');
+  if (IS_WINDOWS) return installCliWindows(script, dirFlag);
   try { fs.chmodSync(script, 0o755); } catch {}
   const dirs = dirFlag ? [path.resolve(dirFlag)] : ['/usr/local/bin', path.join(HOME, '.local', 'bin')];
   const problems = [];
@@ -230,6 +255,38 @@ function installCli(dirFlag) {
   return { target, script, links, onPath, patchedRc };
 }
 
+// Windows cannot symlink into PATH without privileges, and a .cmd shim needs no
+// elevation. The shim pins the absolute path of bin/cfm.mjs, so moving the repo
+// means re-running `cfm install-cli`.
+function installCliWindows(script, dirFlag) {
+  const target = dirFlag ? path.resolve(dirFlag) : CFM_BIN_DIR;
+  fs.mkdirSync(target, { recursive: true });
+  const node = process.execPath;
+  const links = [];
+  for (const name of ['cfm', 'cff']) {
+    const shim = path.join(target, name + '.cmd');
+    const body = `@echo off\r\n"${node}" "${script}" %*\r\n`;
+    fs.writeFileSync(shim, body, 'utf8');
+    links.push(shim);
+  }
+  const userPath = process.env.PATH || '';
+  const onPath = userPath.split(path.delimiter).some((d) => path.resolve(d || '.') === path.resolve(target));
+  let patchedPath = null;
+  if (!onPath) {
+    const machine = spawnSync('powershell', ['-NoProfile', '-Command', `[Environment]::GetEnvironmentVariable('Path','User')`], { encoding: 'utf8' });
+    const current = (machine.stdout || '').trim();
+    if (current.split(';').some((d) => path.resolve(d || '.') === path.resolve(target))) {
+      // Already persisted; this shell just inherited an older PATH.
+      patchedPath = 'already in user PATH';
+    } else {
+      const next = current ? current.replace(/;$/, '') + ';' + target : target;
+      const set = spawnSync('powershell', ['-NoProfile', '-Command', `[Environment]::SetEnvironmentVariable('Path', '${next.replace(/'/g, "''")}', 'User')`], { encoding: 'utf8' });
+      if (set.status === 0) patchedPath = 'user PATH';
+    }
+  }
+  return { target, script, links, onPath, patchedRc: patchedPath };
+}
+
 function libraryStaleness() {
   const idx = readLibrary();
   const indexAt = idx.generatedAt ? Date.parse(idx.generatedAt) : 0;
@@ -247,19 +304,30 @@ async function doctorJson() {
   let appVersion = null;
   let codexVersion = null;
   if (fs.existsSync(app)) {
-    const n = spawnSync('/usr/libexec/PlistBuddy', ['-c', 'Print :CFBundleDisplayName', path.join(app, 'Contents/Info.plist')], { encoding: 'utf8' });
-    const v = spawnSync('/usr/libexec/PlistBuddy', ['-c', 'Print :CFBundleShortVersionString', path.join(app, 'Contents/Info.plist')], { encoding: 'utf8' });
-    appName = (n.stdout || '').trim() || null;
-    appVersion = (v.stdout || '').trim() || null;
-  } else checks.push({ level: 'error', id: 'app', message: 'Codex for Free.app not found' });
+    if (IS_WINDOWS) {
+      appName = 'Codex (official)';
+      appVersion = windowsAppVersion(app);
+    } else {
+      const n = spawnSync('/usr/libexec/PlistBuddy', ['-c', 'Print :CFBundleDisplayName', path.join(app, 'Contents/Info.plist')], { encoding: 'utf8' });
+      const v = spawnSync('/usr/libexec/PlistBuddy', ['-c', 'Print :CFBundleShortVersionString', path.join(app, 'Contents/Info.plist')], { encoding: 'utf8' });
+      appName = (n.stdout || '').trim() || null;
+      appVersion = (v.stdout || '').trim() || null;
+    }
+  } else checks.push({ level: 'error', id: 'app', message: IS_WINDOWS ? 'Codex desktop app not found' : 'Codex for Free.app not found' });
   if (bin) {
     const v = spawnSync(bin, ['--version'], { encoding: 'utf8' });
     codexVersion = (v.stdout || '').trim() || null;
   } else checks.push({ level: 'error', id: 'codex', message: 'Codex CLI not found' });
   let configMode = null;
   try {
-    configMode = '0' + (fs.statSync(CONFIG_PATH).mode & 0o777).toString(8);
-    if ((fs.statSync(CONFIG_PATH).mode & 0o777) !== 0o600) checks.push({ level: 'warn', id: 'config-mode', message: 'config.toml mode is not 600' });
+    const acl = aclIsPrivate(CONFIG_PATH);
+    if (acl === null) {
+      configMode = '0' + (fs.statSync(CONFIG_PATH).mode & 0o777).toString(8);
+      if ((fs.statSync(CONFIG_PATH).mode & 0o777) !== 0o600) checks.push({ level: 'warn', id: 'config-mode', message: 'config.toml mode is not 600' });
+    } else {
+      configMode = acl ? 'acl-private' : 'acl-shared';
+      if (!acl) checks.push({ level: 'warn', id: 'config-acl', message: 'config.toml ACL is not limited to the current user' });
+    }
   } catch { checks.push({ level: 'error', id: 'config', message: 'config.toml not found' }); }
   let panel = false;
   try {
@@ -284,6 +352,20 @@ async function doctorJson() {
 }
 
 function runRepair() {
+  if (IS_WINDOWS) {
+    // Nothing is renamed on Windows, so repair is just: re-apply the provider
+    // contract through install.ps1 without touching the official app.
+    const key = readSecret('deepseek') || keyFromConfig();
+    if (!key) throw new Error('找不到 DeepSeek key；先运行 installer/install.ps1');
+    const installer = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'installer', 'install.ps1');
+    if (!fs.existsSync(installer)) throw new Error('installer/install.ps1 不存在');
+    // Pass the key through the environment: a command line is visible to any
+    // process on the machine, an env var of a child is not.
+    const r = spawnSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', installer, '-Yes'],
+      { stdio: 'inherit', env: { ...process.env, CFM_KEY: key, DEEPSEEK_API_KEY: key } });
+    if (r.status !== 0) throw new Error('安装器修复失败，退出码 ' + r.status);
+    return { ok: true, app: APP_PATH, source: 'official (unmodified)', installer };
+  }
   const target = APP_PATH;
   const preferred = process.env.CHATGPT_APP || '/Applications/ChatGPT.app';
   // After the official app is removed, repair still works by rebuilding from the installed frontend.
@@ -302,6 +384,22 @@ function runRepair() {
 
 function runUninstall({ yes = false, keepConfig = false } = {}) {
   if (!yes) throw new Error('uninstall requires --yes');
+  if (IS_WINDOWS) {
+    // The official app is never moved here: uninstall only reverts the config.
+    let restored = null;
+    if (!keepConfig) {
+      const dir = path.dirname(CONFIG_PATH);
+      const backups = fs.readdirSync(dir).filter((n) => n.startsWith('config.toml.bak-cfm-')).sort();
+      if (backups.length) {
+        const latest = path.join(dir, backups[backups.length - 1]);
+        if (fs.existsSync(CONFIG_PATH)) fs.copyFileSync(CONFIG_PATH, path.join(dir, 'config.toml.bak-uninstall-' + Date.now()));
+        fs.copyFileSync(latest, CONFIG_PATH);
+        lockFileAcl(CONFIG_PATH);
+        restored = latest;
+      }
+    }
+    return { ok: true, moved: null, restored, note: 'official Codex app left untouched' };
+  }
   const app = APP_PATH;
   let moved = null;
   if (fs.existsSync(app)) {
@@ -336,7 +434,7 @@ async function openPanel(port, target = '/?view=panel') {
   try {
     const r = await fetch(base + '/api/summary', { signal: AbortSignal.timeout(1200) });
     if (r.ok) {
-      spawn('open', [base + target], { detached: true, stdio: 'ignore' }).unref();
+      openPath(base + target);
       return;
     }
   } catch {}
@@ -385,7 +483,8 @@ export async function main(argv) {
   cfm ui [--port 4317]               启动本地面板（对话前端请用应用图标）
   cfm panel                           只打开管理面板
   cfm knowledge                       打开本地知识库（对话/项目文件）
-  cfm completion [zsh|bash]          输出命令补全
+  cfm config check                   校验 config.toml（重复根键/重复表/解析）
+  cfm completion [zsh|bash|powershell] 输出命令补全
   cfm restore-official                从官方 config.toml 移除 CFM 修改
   cfm check                           检查更新
   cfm update                          安装最新版（npm -g codex-for-free@latest）
@@ -523,7 +622,7 @@ export async function main(argv) {
     if (sub === 'open') {
       const dir = libraryRoot();
       fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-      spawn('open', [dir], { detached: true, stdio: 'ignore' }).unref();
+      openPath(dir);
       out('已打开: ' + dir); return;
     }
     throw new Error('library 子命令: export | list | path | set | open');
@@ -657,6 +756,31 @@ export async function main(argv) {
     throw new Error('catalog 子命令: build <id>');
   }
 
+  if (cmd === 'config') {
+    const sub = flags._[0] || 'check';
+    if (sub !== 'check') throw new Error('config 子命令: check');
+    let text = '';
+    try { text = fs.readFileSync(CONFIG_PATH, 'utf8'); }
+    catch { throw new Error('config.toml 不存在: ' + CONFIG_PATH); }
+    const r = checkCodexConfig(text);
+    const py = which('python') || which('python3');
+    let parser = null;
+    if (py) {
+      const pr = spawnSync(py, ['-c', 'import tomllib,sys;tomllib.loads(open(sys.argv[1],encoding="utf-8").read());print("ok")', CONFIG_PATH], { encoding: 'utf8' });
+      parser = { tool: 'python tomllib', ok: pr.status === 0, error: pr.status === 0 ? null : (pr.stderr || '').trim().slice(0, 300) };
+    }
+    const ok = r.ok && (!parser || parser.ok);
+    if (wantJson) return jsonOut({ path: CONFIG_PATH, ok, lint: r, parser });
+    out('config: ' + CONFIG_PATH);
+    if (!r.errors.length) out('  ✓ 无重复根键 / 无重复表');
+    for (const e of r.errors) out(`  ! 第 ${e.line} 行: ${e.message}（首次出现在第 ${e.first} 行）`);
+    if (r.missing.length) out('  ! 缺少根键: ' + r.missing.join(', '));
+    if (parser) out(parser.ok ? '  ✓ ' + parser.tool + ' 解析通过' : '  ! ' + parser.tool + ': ' + parser.error);
+    else out('  · 没有 python，跳过完整解析（用 lint 检查）');
+    if (!ok) process.exitCode = 1;
+    return;
+  }
+
   if (cmd === 'check') {
     const r = await checkForUpdates();
     if (wantJson) return jsonOut(r);
@@ -682,15 +806,25 @@ export async function main(argv) {
     for (const link of r.links) out('  ' + link);
     out('  目标 ' + r.script);
     if (r.onPath) out('  现在可以直接运行 cfm doctor');
+    else if (r.patchedRc === 'already in user PATH') out(`  ${r.target} 已在用户 PATH 中，重开终端即可`);
+    else if (r.patchedRc && IS_WINDOWS) out(`  已把 ${r.target} 写入用户 PATH，重开终端后生效`);
     else if (r.patchedRc) out(`  已在 ${r.patchedRc} 写入 PATH，新开终端或用 source ${r.patchedRc} 生效`);
+    else if (IS_WINDOWS) out(`  ! ${r.target} 不在 PATH，手动加入用户 PATH 后重开终端`);
     else out(`  ! ${r.target} 不在 PATH，加一行到 ~/.zshrc：export PATH="${r.target}:$PATH"`);
     return;
   }
 
   if (cmd === 'completion') {
-    const shell = flags._[0] || 'zsh';
+    const shell = flags._[0] || (IS_WINDOWS ? 'powershell' : 'zsh');
     const commands = ['doctor','search','backup','restore','repair','uninstall','storage','library','folders','skills','providers','catalog','codex','install-cli','ui','panel','knowledge','restore-official','check','update','completion'];
-    if (shell === 'bash') {
+    if (shell === 'powershell') {
+      out(`Register-ArgumentCompleter -Native -CommandName cfm,cff -ScriptBlock {`);
+      out(`  param($wordToComplete, $commandAst, $cursorPosition)`);
+      out(`  '${commands.join(',')}' -split ',' | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {`);
+      out(`    [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)`);
+      out(`  }`);
+      out(`}`);
+    } else if (shell === 'bash') {
       out(`complete -W "${commands.join(' ')}" cfm`);
     } else {
       out(`#compdef cfm`);
@@ -726,7 +860,7 @@ export async function main(argv) {
   if (cmd === 'knowledge' || (cmd === 'library' && !flags._[0])) {
     const dir = libraryRoot();
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-    spawn('open', [dir], { detached: true, stdio: 'ignore' }).unref();
+    openPath(dir);
     out('已打开知识库: ' + dir);
     return;
   }

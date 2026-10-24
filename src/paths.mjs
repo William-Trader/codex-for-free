@@ -5,6 +5,10 @@ import { fileURLToPath } from 'node:url';
 import { which } from './util.mjs';
 
 export const HOME = os.homedir();
+export const IS_WINDOWS = process.platform === 'win32';
+export const IS_MAC = process.platform === 'darwin';
+export const LOCAL_APP_DATA = process.env.LOCALAPPDATA || path.join(HOME, 'AppData', 'Local');
+export const PROGRAM_FILES = process.env.ProgramFiles || path.join('C:', 'Program Files');
 export const OFFICIAL_CODEX_HOME = process.env.OFFICIAL_CODEX_HOME || path.join(HOME, '.codex');
 
 // The live GPT frontend reads ~/.codex. Older installs used ~/.codex-for-free.
@@ -24,6 +28,8 @@ function pickCodexHome() {
 }
 
 export const CODEX_HOME = pickCodexHome();
+// Keep the macOS directory name on every platform so the two ports do not fork
+// their data layout: only the home prefix differs.
 export const CFM_HOME = process.env.CFM_HOME || path.join(HOME, '.codex-for-mac');
 export const CONFIG_PATH = path.join(CODEX_HOME, 'config.toml');
 export const OFFICIAL_CONFIG_PATH = path.join(OFFICIAL_CODEX_HOME, 'config.toml');
@@ -40,10 +46,39 @@ export const REGISTRY_PATH = path.join(CFM_HOME, 'providers.json');
 export const CFM_CONFIG_PATH = path.join(CFM_HOME, 'config.json');
 export const DEFAULT_LIBRARY = path.join(HOME, 'Documents', 'Codex Library');
 
-const BUNDLED_CODEX = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'codex-cli', 'bin', 'codex');
+// Windows CLI shim lives in a per-user directory; no administrator rights needed.
+export const CFM_BIN_DIR = process.env.CFM_BIN_DIR || path.join(LOCAL_APP_DATA, 'Programs', 'cfm');
+
+const BUNDLED_CODEX = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'codex-cli', 'bin', IS_WINDOWS ? 'codex.exe' : 'codex');
+
+// The Windows desktop app ships the CLI under bin/<build-hash>/codex.exe.
+// Pick the newest build so an app update is followed automatically.
+function windowsCliBins() {
+  const found = [];
+  const roots = [
+    path.join(LOCAL_APP_DATA, 'OpenAI', 'Codex', 'bin'),
+    path.join(LOCAL_APP_DATA, 'Programs', 'Codex', 'bin'),
+    path.join(LOCAL_APP_DATA, 'Programs', 'codex', 'bin')
+  ];
+  for (const root of roots) {
+    let entries = [];
+    try { entries = fs.readdirSync(root, { withFileTypes: true }); } catch { continue; }
+    for (const ent of entries) {
+      if (!ent.isDirectory()) continue;
+      const bin = path.join(root, ent.name, 'codex.exe');
+      try {
+        const st = fs.statSync(bin);
+        if (st.isFile()) found.push({ bin, mtime: st.mtimeMs });
+      } catch {}
+    }
+  }
+  found.sort((a, b) => b.mtime - a.mtime);
+  return found.map((x) => x.bin);
+}
 
 function installedAppBins() {
   const found = [];
+  if (IS_WINDOWS) return found;
   for (const base of ['/Applications', path.join(HOME, 'Applications')]) {
     let entries = [];
     try { entries = fs.readdirSync(base, { withFileTypes: true }); } catch { continue; }
@@ -56,14 +91,29 @@ function installedAppBins() {
 }
 
 export function locateCodex() {
-  const candidates = [
-    process.env.CODEX_BIN,
+  const macCandidates = IS_WINDOWS ? [] : [
     BUNDLED_CODEX,
     '/Applications/Codex for Free.app/Contents/Resources/codex-cli/bin/codex',
     '/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex',
     '/Applications/Codex.app/Contents/Resources/codex-cli/bin/codex',
     path.join(HOME, 'Applications', 'Codex for Free.app', 'Contents', 'Resources', 'codex-cli', 'bin', 'codex'),
-    path.join(HOME, 'Applications', 'ChatGPT.app', 'Contents', 'Resources', 'codex-cli', 'bin', 'codex'),
+    path.join(HOME, 'Applications', 'ChatGPT.app', 'Contents', 'Resources', 'codex-cli', 'bin', 'codex')
+  ];
+  const winCandidates = IS_WINDOWS ? [
+    BUNDLED_CODEX,
+    ...windowsCliBins(),
+    path.join(LOCAL_APP_DATA, 'OpenAI', 'Codex', 'codex.exe'),
+    path.join(LOCAL_APP_DATA, 'Programs', 'Codex', 'codex.exe'),
+    path.join(LOCAL_APP_DATA, 'Programs', 'codex', 'codex.exe'),
+    path.join(PROGRAM_FILES, 'Codex', 'codex.exe'),
+    path.join(PROGRAM_FILES, 'OpenAI', 'Codex', 'codex.exe'),
+    which('codex'),
+    which('codex.exe')
+  ] : [];
+  const candidates = [
+    process.env.CODEX_BIN,
+    ...winCandidates,
+    ...macCandidates,
     ...installedAppBins(),
     which('codex')
   ].filter(Boolean);
