@@ -62,7 +62,8 @@ test('reasoning levels keep only supported efforts', () => {
 });
 
 test('tomlValue escapes Windows paths as a valid TOML basic string', () => {
-  const p = path.join('C:' + path.sep, 'Users', 'Administrator', '.codex-for-mac', 'catalog', 'deepseek.json');
+  // Use a literal Windows path: path.join would emit '/' when tests run on macOS/Linux.
+  const p = 'C:\\Users\\Administrator\\.codex-for-mac\\catalog\\deepseek.json';
   const out = tomlValue(p);
   assert.equal(out[0], '"');
   assert.ok(out.includes('\\\\'), 'backslashes must be escaped');
