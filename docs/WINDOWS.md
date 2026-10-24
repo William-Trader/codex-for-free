@@ -76,7 +76,7 @@ Windows 11 10.0.26300 / PowerShell 5.1.26100 / node 24.19.0 / codex-cli 0.163.0-
 | 9 | backup | `cfm backup --out bk.zip` | 21 entries, **0** `secrets` entries |
 | 10 | restore | `cfm restore bk.zip --yes` | config/providers/library restored; `config check` still passes |
 | 11 | library | `cfm library export` | 4 projects / 5 conversations from the live DB |
-| 12 | CLI shim | `cfm.cmd version` | `1.3.1` through `%LOCALAPPDATA%\Programs\cfm` |
+| 12 | CLI shim | `cfm.cmd version` | `1.3.0` through `%LOCALAPPDATA%\Programs\cfm` |
 
 Catalog fields observed in `.codex-for-mac\catalog\deepseek.json`:
 
@@ -90,7 +90,7 @@ Catalog fields observed in `.codex-for-mac\catalog\deepseek.json`:
 | `default_reasoning_level` | high | high |
 | `input_modalities` | text + image | text |
 
-## Round 2 fixes (1.3.1)
+## Round 2 fixes (1.3.0)
 
 - shim template bug: the generated `.cmd` contained a literal `"${node}"`
 - `repair` no longer puts the API key on a child command line
