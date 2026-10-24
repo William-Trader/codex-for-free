@@ -2,7 +2,7 @@
 
 **给官方 Codex 客户端加上可选的 DeepSeek provider，外加本地 CLI、管理面板与对话知识库。macOS 与 Windows 双平台，同一版本号。**
 
-当前版本：**v1.2.1**（macOS 与 Windows 版本号一致，各自独立发布）
+当前版本：**v1.3.0**（macOS 与 Windows 同版本发布，两个平台包）
 
 > 官方 OpenAI 应用不进入本仓库，也不随 Release 再分发。安装器只在本机操作你已经安装的应用。
 
@@ -29,7 +29,7 @@
 安装器自 v1.2.0 起未改动。
 
 1. 安装官方 ChatGPT macOS 应用
-2. 使用本平台的 `Codex-for-Free-1.2.1-macOS.zip`（或仓库里的 `installer/install.sh`）
+2. 使用本平台的 `Codex-for-Free-1.3.0-macOS.zip`（或仓库里的 `installer/install.sh`）
 3. 双击 `Install Codex for Free.command`，按提示输入自己的 DeepSeek API key
 
 安装器会：
@@ -41,7 +41,7 @@
 
 `repair` 需要官方 `/Applications/ChatGPT.app` 存在；`uninstall` 只移动 app 并恢复配置，不删除知识库。
 
-## Windows（v1.2.1）
+## Windows（v1.3.0）
 
 **不改名、不重签、不复制、不绕登录。** 只给官方 Codex 增加一个可选的 DeepSeek provider。
 
@@ -58,7 +58,7 @@
 7. `cfm config check`：重复根键 / 重复表校验 + `python tomllib` 解析
 8. `cfm install-cli`：写 `cfm.cmd` / `cff.cmd`，追加用户级 PATH
 
-Release 资产：`Codex-for-Free-1.2.1-Windows.zip`（Windows 单独发布，不与 macOS 合并）。
+Release 资产：`Codex-for-Free-1.3.0-Windows.zip`（与 macOS 同属 v1.3.0 发布）。
 
 已知限制见 [docs/WINDOWS.md](docs/WINDOWS.md)：这版 Windows build 不认 `--sandbox workspace-write`（会降级为 read-only），所以写文件/跑命令的验证是用 `danger-full-access` 做的。
 

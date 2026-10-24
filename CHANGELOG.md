@@ -1,4 +1,4 @@
-## v1.2.1 — 2026-10-24 — Windows 支持（macOS 行为未变）
+## v1.3.0 — 2026-10-24 — 统一发布：Windows 支持 + macOS 同步
 
 - 新增 Windows 安装器 `installer/install.ps1`：只增不改，不改名、不重签、不复制官方应用，不绕过登录
 - Windows：`cfm.cmd` / `cff.cmd` 入口装到 `%LOCALAPPDATA%\Programs\cfm`，用户级 PATH，无需管理员
